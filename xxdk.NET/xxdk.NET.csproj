@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Folder Include="bin\" />
+    <Folder Include="bin\Debug\" />
+    <Folder Include="bin\Debug\net7.0\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="bin\Debug\net7.0\libxxdk.h" />
+    <None Include="bin\Debug\net7.0\libxxdk.so" />
+  </ItemGroup>
+</Project>

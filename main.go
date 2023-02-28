@@ -7,28 +7,26 @@
 
 package main
 
-// /////////////////////////////////////////////////////////////////////////////
-// //                                                                         //
-// // Direct Messaging Callbacks (you must implement these)                   //
-// //                                                                         //
-// /////////////////////////////////////////////////////////////////////////////
+// #include "callbacks.h"
+// #cgo CFLAGS: -I .
 //
+// // below are the callbacks defined in callbacks.go
 // extern long cmix_dm_receive(int dm_instance_id,
 //    void* mesage_id, int message_id_len,
 //    char* nickname, int nickname_len,
 //    void* text, int text_len,
 //    void* pubkey, int pubkey_len,
 //    int dmToken, int codeset,
-//    long timestamp, long round_id, long msg_type, long status);
+//    long timestamp, long round_id, long message_type, long status);
 // extern long cmix_dm_receive_text(int dm_instance_id,
-//    void* mesage_id, int message_id_len,
+//    void* message_id, int message_id_len,
 //    char* nickname, int nickname_len,
 //    char* text, int text_len,
 //    void* pubkey, int pubkey_len,
 //    int dmToken, int codeset,
 //    long timestamp, long round_id, long status);
 // extern long cmix_dm_receive_reply(int dm_instance_id,
-//    void* mesage_id, int message_id_len,
+//    void* message_id, int message_id_len,
 //    void* reply_to, int reply_to_len,
 //    char* nickname, int nickname_len,
 //    char* text, int text_len,
@@ -36,7 +34,7 @@ package main
 //    int dmToken, int codeset,
 //    long timestamp, long round_id, long status);
 // extern long cmix_dm_receive_reaction(int dm_instance_id,
-//    void* mesage_id, int message_id_len,
+//    void* message_id, int message_id_len,
 //    void* reaction_to, int reaction_to_len,
 //    char* nickname, int nickname_len,
 //    char* text, int text_len,
@@ -50,6 +48,8 @@ package main
 import "C"
 
 import (
+	"unsafe"
+
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/client/v4/bindings"
@@ -228,6 +228,8 @@ func cmix_GenerateCodenameIdentity(secretPassphrase string) []byte {
 	return cnBytes
 }
 
+var dmReceivers map[int]*dmReceiver
+
 //export cmix_dm_NewDMClient
 func cmix_dm_NewDMClient(cMixInstanceID int, codenameIdentity []byte,
 	secretPassphrase string) (int, error) {
@@ -243,7 +245,15 @@ func cmix_dm_NewDMClient(cMixInstanceID int, codenameIdentity []byte,
 	if err != nil {
 		return -1, err
 	}
-	return dmClient.GetID(), nil
+
+	// Set up receiver tracking
+	if dmReceivers == nil {
+		dmReceivers = make(map[int]*dmReceiver)
+	}
+	cid := dmClient.GetID()
+	myReceiver.dmClientID = cid
+	dmReceivers[cid] = myReceiver
+	return cid, nil
 }
 
 //export cmix_dm_GetDMToken
@@ -279,9 +289,16 @@ func cmix_dm_SendText(dmInstanceID int, partnerPubKey []byte,
 		message, leaseTimeMS, cmixParamsJSON)
 }
 
+type ReceiveCallback func(dmClientID C.int, messageID unsafe.Pointer,
+	messageIDLen C.int, nickname *C.char, nicknameLen C.int,
+	text unsafe.Pointer, textLen C.int,
+	pubKey unsafe.Pointer, pubKeyLen C.int,
+	dmToken C.int, codeset C.int, timestamp C.long, roundId C.long,
+	mType C.long, status C.long) C.long
+
 // This implements the bindings.DMReceiver interface.
 type dmReceiver struct {
-	dmClientID int32
+	dmClientID int
 }
 
 func (dmr *dmReceiver) Receive(messageID []byte, nickname string,
