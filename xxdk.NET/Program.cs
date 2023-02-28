@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics.Metrics;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -6,6 +7,10 @@ namespace SharedC
 {
     unsafe class Program
     {
+        /// <summary>
+        /// Go Data Structures
+        /// </summary>
+
         // GoString represents a String in
         // golang and allows us to pass strings to
         // the external shared library function as
@@ -21,11 +26,50 @@ namespace SharedC
         // can pass slices to the go external
         // shared library.
         struct GoSlice
-        {
+        {   
             public IntPtr data;
             public Int64 len;
             public Int64 cap;
         }
+
+        /// <summary>
+        /// Callback Functions to implement.
+        /// </summary>
+        private delegate long DMReceiveCallbackFn(int dm_instance_id,
+            void* message_id, int message_id_len,
+            char* nickname, int nickname_len,
+            void* text, int text_len,
+            void* pubkey, int pubkey_len,
+            int dmToken, int codeset,
+            long timestamp, long round_id, long msg_type, long status);
+        private delegate long DMReceiveTextCallbackFn(int dm_instance_id,
+            void* mesage_id, int message_id_len,
+            char* nickname, int nickname_len,
+            char* text, int text_len,
+            void* pubkey, int pubkey_len,
+            int dmToken, int codeset,
+            long timestamp, long round_id, long status);
+        private delegate long DMReceiveReplyCallbackFn(int dm_instance_id,
+            void* mesage_id, int message_id_len,
+            void* reply_to, int reply_to_len,
+            char* nickname, int nickname_len,
+            char* text, int text_len,
+            void* pubkey, int pubkey_len,
+            int dmToken, int codeset,
+            long timestamp, long round_id, long status);
+        private delegate long DMReceiveReactionCallbackFn(int dm_instance_id,
+            void* mesage_id, int message_id_len,
+            void* reaction_to, int reaction_to_len,
+            char* nickname, int nickname_len,
+            char* text, int text_len,
+            void* pubkey, int pubkey_len,
+            int dmToken, int codeset,
+            long timestamp, long round_id, long status);
+        private delegate long DMUpdateSentStatusCallbackFn(int dm_instance_id,
+            long uuid,
+            void* message_id, int message_id_len, long timestamp,
+            long round_id, long status);
+
 
         static void Main(string[] args)
         {
@@ -126,8 +170,10 @@ namespace SharedC
                 "\n#########################################\n"
             );
             GoString myver;
-            myver = xxdk.GetVersion();
-            Console.WriteLine($"HelloWorld: {myver.p}");
+            myver = XXDK.GetVersion();
+            Console.WriteLine($"HelloWorld: {ConvertGoString(myver)}");
+            myver = XXDK.GetDependencies();
+            Console.WriteLine($"HelloWorld: {ConvertGoString(myver)}");
 
             // free up allocated unmanaged memory
             /*
@@ -138,7 +184,12 @@ namespace SharedC
             */
         }
 
-        // Prints an Int64 array to a pretty string
+        private static string ConvertGoString(GoString gs)
+        {
+            return Marshal.PtrToStringAnsi(gs.p, unchecked((int)gs.n));
+        }
+
+    // Prints an Int64 array to a pretty string
         private static string Int64ArrayToString(Int64[] arr)
         {
             var strBuilder = new StringBuilder("");
@@ -165,10 +216,24 @@ namespace SharedC
             return strBuilder.ToString();
         }
 
-        static class xxdk
+        [StructLayout(LayoutKind.Sequential)]
+        public class DMReceiverCallbackFunctions
         {
-            [DllImport("libxxdk.so", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.StdCall, SetLastError = true)]
+            DMReceiveCallbackFn? receiveFn;
+            DMReceiveTextCallbackFn? receiveTextFn;
+            DMReceiveReplyCallbackFn? receiveReplyFn;
+            DMReceiveTextCallbackFn? receiveReactionFn;
+            DMUpdateSentStatusCallbackFn? updateSentStatusFn;
+        }
+        static class XXDK
+        {
+            [DllImport("libxxdk.so")]
+            public static extern void cmix_dm_set_callbacks(DMReceiverCallbackFunctions cbs);
+
+            [DllImport("libxxdk.so")]
             public static extern GoString GetVersion();
+            [DllImport("libxxdk.so")]
+            public static extern GoString GetDependencies();
         }
 
     }

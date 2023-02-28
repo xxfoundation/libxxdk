@@ -45,11 +45,10 @@ package main
 //    long uuid,
 //    void* message_id, int message_id_len, long timestamp,
 //    long round_id, long status);
+// extern void cmix_dm_set_callbacks(DMReceiverCallbackFunctions cbs);
 import "C"
 
 import (
-	"unsafe"
-
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/client/v4/bindings"
@@ -288,13 +287,6 @@ func cmix_dm_SendText(dmInstanceID int, partnerPubKey []byte,
 	return dmClient.SendText(partnerPubKey, dmToken,
 		message, leaseTimeMS, cmixParamsJSON)
 }
-
-type ReceiveCallback func(dmClientID C.int, messageID unsafe.Pointer,
-	messageIDLen C.int, nickname *C.char, nicknameLen C.int,
-	text unsafe.Pointer, textLen C.int,
-	pubKey unsafe.Pointer, pubKeyLen C.int,
-	dmToken C.int, codeset C.int, timestamp C.long, roundId C.long,
-	mType C.long, status C.long) C.long
 
 // This implements the bindings.DMReceiver interface.
 type dmReceiver struct {

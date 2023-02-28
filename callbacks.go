@@ -71,11 +71,18 @@ package main
 //       nickname, nickname_len, text, text_len, pubkey, pubkey_len,
 //       dmToken, codeset, timestamp, round_id, status);
 // }
-// extern void cmix_dm_update_sent_status(int dm_instance_id,
+// void cmix_dm_update_sent_status(int dm_instance_id,
 //    long uuid,
 //    void* message_id, int message_id_len, long timestamp,
 //    long round_id, long status) {
 //    DMReceiverCallbacks.updateSentStatusFn(dm_instance_id, uuid,
 //        message_id, message_id_len, timestamp, round_id, status);
+// }
+// extern void cmix_dm_set_callbacks(DMReceiverCallbackFunctions cbs) {
+//     DMReceiverCallbacks.receiveFn = cbs.receiveFn;
+//     DMReceiverCallbacks.receiveTextFn = cbs.receiveTextFn;
+//     DMReceiverCallbacks.receiveReplyFn = cbs.receiveReplyFn;
+//     DMReceiverCallbacks.receiveReactionFn = cbs.receiveReactionFn;
+//     DMReceiverCallbacks.updateSentStatusFn = cbs.updateSentStatusFn;
 // }
 import "C"
