@@ -58,8 +58,14 @@ struct GoError
     public IntPtr Msg;
     public Int32 MsgLen;
 }
-/* Return type for LoadCmix */
 [StructLayout(LayoutKind.Sequential)]
+struct GoByteSlice
+{
+    public Int64 len;
+    public IntPtr data;
+}
+/* Return type for LoadCmix */
+    [StructLayout(LayoutKind.Sequential)]
 struct LoadCmix_return
 {
     public GoInt32 cMixInstanceID;
@@ -69,43 +75,43 @@ struct LoadCmix_return
 [StructLayout(LayoutKind.Sequential)]
 struct cmix_GetReceptionID_return
 {
-    public GoSlice r0;
-    public GoError r1;
+    public GoByteSlice receptionID;
+    public GoError Err;
 }
 /* Return type for cmix_EKVGet */
 [StructLayout(LayoutKind.Sequential)]
 struct cmix_EKVGet_return
 {
-    public GoSlice r0;
-    public GoError r1;
+    public GoByteSlice Val;
+    public GoError Err;
 }
 /* Return type for cmix_dm_NewDMClient */
 [StructLayout(LayoutKind.Sequential)]
 struct cmix_dm_NewDMClient_return
 {
-    public GoInt r0;
-    public GoError r1;
+    public GoInt32 DMInstanceID;
+    public GoError Err;
 }
 /* Return type for cmix_dm_GetDMToken */
 [StructLayout(LayoutKind.Sequential)]
 struct cmix_dm_GetDMToken_return
 {
-    public GoUint32 r0;
-    public GoError r1;
+    public GoUint32 Token;
+    public GoError Err;
 }
 /* Return type for cmix_dm_GetDMPubKey */
 [StructLayout(LayoutKind.Sequential)]
 struct cmix_dm_GetDMPubKey_return
 {
-    public GoSlice r0;
-    public GoError r1;
+    public GoByteSlice PubKey;
+    public GoError Err;
 }
 /* Return type for cmix_dm_SendText */
 [StructLayout(LayoutKind.Sequential)]
 struct cmix_dm_SendText_return
 {
-    public GoSlice r0;
-    public GoError r1;
+    public GoByteSlice SendReportJSON;
+    public GoError Err;
 }
 
 public unsafe class Program
@@ -137,11 +143,19 @@ public unsafe class Program
             cap = n,
             len = n
         };
+        Marshal.Copy(data, 0, gs.data, n);
         return gs;
     }
     private static void FreeGoSlice(GoSlice freeMe)
     {
         Marshal.FreeHGlobal(freeMe.data);
+    }
+    private static Byte[] GoByteSliceToBytes(GoByteSlice slice)
+    {
+        Int32 n = unchecked((int)(slice.len));
+        Byte[] res = new Byte[n];
+        Marshal.Copy(slice.data, res, 0, n);
+        return res;
     }
 
     /// <summary>
@@ -276,64 +290,7 @@ public unsafe class Program
         // Setup DMReceiver Callbacks with the library.
         DMReceiverCallbackFunctions CBs = new DMReceiverCallbackFunctions();
         XXDK.cmix_dm_set_callbacks(CBs);
-        /*
 
-
-
-        // call the external functions
-
-        int addResult = GoMath.Add(a, b);
-        int subResult = GoMath.Sub(a, b);
-        double cosineResult = GoMath.Cosine(x);
-        int sumResult = GoMath.Sum(gs);
-        var helloResult = GoHello.HelloWorld(s);
-        GoMath.Sort(gs);
-
-        // Read the Sorted GoSlice
-
-        n = (int)gs.len;
-        Int64[] arr = new Int64[n];
-
-        for (int i = 0; i < n; i++)
-        {
-            arr[i] = Marshal.ReadInt64(gs.data, i * Marshal.SizeOf(typeof(Int64)));
-        }
-
-        // Read the size of the data returned by HelloWorld
-        // The size is an int32, so we read 4 bytes
-
-        byte* buf = (byte*)helloResult;
-        byte[] lenBytes = new byte[4];
-
-        for (int i = 0; i < 4; i++)
-        {
-            lenBytes[i] = *buf++;
-        }
-
-        // Read the result itself
-
-        n = BitConverter.ToInt32(lenBytes, 0);
-        int j = 0;
-        byte[] bytes = new byte[n];
-
-        for (int i = 0; i < n; i++)
-        {
-            // Skip the first 4 bytes because
-            // they hold the size
-
-            if (i < 4)
-            {
-                *buf++ = 0;
-            }
-            else
-            {
-                bytes[j] = *buf++;
-                j++;
-            }
-        }
-
-        // Print results
-        */
         Console.WriteLine(
             "#########################################" +
             "\n### .NET xxdk Shared-C Golang .dll    ###" +
@@ -350,64 +307,37 @@ public unsafe class Program
             cMix.NewCmix(ndfJSON, stateDir, secret, "");
         }
         int cMixID = cMix.LoadCmix(stateDir, secret, cMixParamsJSON);
-        /*
-        cmixParams, _:= initParams()
 
-        user:= loadOrInitCmix([]byte(viper.GetString(passwordFlag)),
-			viper.GetString(sessionFlag), "", cmixParams)
+        Byte[] receptionID = cMix.GetReceptionID(cMixID);
+        Console.WriteLine("cMix Reception ID: " +
+            System.Convert.ToBase64String(receptionID));
 
-		// Print user's reception ID
-		identity:= user.GetStorage().GetReceptionID()
-
-        jww.INFO.Printf("User: %s", identity)
-
-        // NOTE: DM ID's are not storage backed, so we do the
-        // storage here.
-        ekv:= user.GetStorage().GetKV()
-
-        rng:= user.GetRng().GetStream()
-
-        defer rng.Close()
-
-        dmIDObj, err:= ekv.Get("dmID", 0)
-
-        if err != nil && ekv.Exists(err) {
-            jww.FATAL.Panicf("%+v", err)
-
-        }
-        var dmID codename.PrivateIdentity
-
-        if ekv.Exists(err) {
-            dmID, err = codename.UnmarshalPrivateIdentity(
-                dmIDObj.Data)
-
-        }
-        else
+        Byte[] dmID;
+        try
         {
-            dmID, err = codename.GenerateIdentity(rng)
-
+            dmID = cMix.EKVGet(cMixID, "MyDMID");
         }
-        if err != nil {
-            jww.FATAL.Panicf("%+v", err)
-
+        catch (Exception)
+        {
+            Console.WriteLine("Generating DM Identity...");
+            dmID = cMix.GenerateCodenameIdentity("Hello");
+            Console.WriteLine("Exported Codename Blob: " +
+                System.Convert.ToBase64String(dmID));
+            cMix.EKVSet(cMixID, "MyDMID", dmID);
         }
-    dmToken:= dmID.GetDMToken()
 
-        pubKeyBytes:= dmID.PubKey[:]
+        Console.WriteLine("Exported Codename Blob: " +
+            Encoding.UTF8.GetString(dmID));
 
+        Int32 dmClientID = DM.NewClient(cMixID, dmID, "Hello");
 
-        ekv.Set("dmID", &versioned.Object{
-        Version: 0,
-			Timestamp: time.Now(),
-			Data: dmID.Marshal(),
-		})
-
-		jww.INFO.Printf("DMPUBKEY: %s",
-            base64.RawStdEncoding.EncodeToString(pubKeyBytes))
-
-        jww.INFO.Printf("DMTOKEN: %d", dmToken)
+        UInt32 myToken = DM.GetToken(dmClientID);
+        Byte[] pubKey = DM.GetPubKey(dmClientID);
+        Console.WriteLine("DMPUBKEY: " + System.Convert.ToBase64String(pubKey));
+        Console.WriteLine("DMTOKEN: " + myToken);
 
 
+        /*
         partnerPubKey, partnerDMToken, ok:= getDMPartner()
 
         if !ok {
@@ -549,39 +479,11 @@ public unsafe class Program
 
     private static string ConvertGoString(GoString gs)
     {
-        return Marshal.PtrToStringAnsi(gs.p, unchecked((int)gs.n));
+        return Marshal.PtrToStringUTF8(gs.p, unchecked((int)gs.n));
     }
     private static string ConvertCharPtr(IntPtr buf, Int32 len)
     {
-        return Marshal.PtrToStringAnsi(buf, len);
-    }
-
-
-    // Prints an Int64 array to a pretty string
-    private static string Int64ArrayToString(Int64[] arr)
-    {
-        var strBuilder = new StringBuilder("");
-        var n = arr.Length;
-
-        for (int i = 0; i < n; i++)
-        {
-            if (i == (n - 1))
-            {
-                strBuilder = strBuilder.Append($"{arr[i]}\n");
-            }
-
-            else if (i == 0)
-            {
-                strBuilder = strBuilder.Append($"Sort: {arr[i]}, ");
-            }
-
-            else
-            {
-                strBuilder = strBuilder.Append($"{arr[i]}, ");
-            }
-        }
-
-        return strBuilder.ToString();
+        return Marshal.PtrToStringUTF8(buf, len);
     }
 
     static class cMix
@@ -634,6 +536,173 @@ public unsafe class Program
 
             return ret.cMixInstanceID;
         }
+
+        // cmix_GetReceptionID returns the current default reception ID
+        public static Byte[] GetReceptionID(Int32 cMixInstanceID)
+        {
+            cmix_GetReceptionID_return rid = XXDK.cmix_GetReceptionID(
+                cMixInstanceID);
+            GoError err = rid.Err;
+            if (err.IsError != 0)
+            {
+                String errMsg = ConvertCharPtr(err.Msg, err.MsgLen);
+                throw new Exception(errMsg);
+            }
+            return GoByteSliceToBytes(rid.receptionID);
+        }
+
+        public static Byte[] EKVGet(Int32 cMixInstanceID, String key)
+        {
+            GoString goKey = NewGoString(key);
+            cmix_EKVGet_return ret = XXDK.cmix_EKVGet(cMixInstanceID, goKey);
+
+            GoError err = ret.Err;
+            if (err.IsError != 0)
+            {
+                String errMsg = ConvertCharPtr(err.Msg, err.MsgLen);
+                throw new Exception(errMsg);
+            }
+            return GoByteSliceToBytes(ret.Val);
+        }
+
+        public static void EKVSet(Int32 cMixInstanceID, String key,
+            Byte[] value)
+        {
+            GoString goKey = NewGoString(key);
+            GoSlice goVal = NewGoSlice(value);
+            GoError err = XXDK.cmix_EKVSet(cMixInstanceID, goKey, goVal);
+            if (err.IsError != 0)
+            {
+                String errMsg = ConvertCharPtr(err.Msg, err.MsgLen);
+                throw new Exception(errMsg);
+            }
+
+            FreeGoSlice(goVal);
+            FreeGoString(goKey);
+        }
+
+        public static void StartNetworkFollower(Int32 cMixInstanceID,
+            Int32 timeoutMS)
+        {
+            GoError err = XXDK.cmix_StartNetworkFollower(cMixInstanceID,
+                timeoutMS);
+            if (err.IsError != 0)
+            {
+                String errMsg = ConvertCharPtr(err.Msg, err.MsgLen);
+                throw new Exception(errMsg);
+            }
+        }
+        public static void StopNetworkFollower(Int32 cMixInstanceID)
+        {
+            GoError err = XXDK.cmix_StopNetworkFollower(cMixInstanceID);
+            if (err.IsError != 0)
+            {
+                String errMsg = ConvertCharPtr(err.Msg, err.MsgLen);
+                throw new Exception(errMsg);
+            }
+        }
+        public static void WaitForNetwork(Int32 cMixInstanceID,
+            Int32 timeoutMS)
+        {
+            GoError err = XXDK.cmix_WaitForNetwork(cMixInstanceID, timeoutMS);
+            if (err.IsError != 0)
+            {
+                String errMsg = ConvertCharPtr(err.Msg, err.MsgLen);
+                throw new Exception(errMsg);
+            }
+        }
+        public static Boolean ReadyToSend(Int32 cMixInstanceID)
+        {
+            GoUint8 ready = XXDK.cmix_ReadyToSend(cMixInstanceID);
+            if (ready != 0) {
+                return true;
+            } 
+            return false;
+        }
+
+        public static Byte[] GenerateCodenameIdentity(
+            String secretPassphrase)
+        {
+            GoString secret = NewGoString(secretPassphrase);
+            Console.WriteLine("Secret: " + secretPassphrase);
+            GoByteSlice id = XXDK.cmix_GenerateCodenameIdentity(secret);
+            FreeGoString(secret);
+            return GoByteSliceToBytes(id);
+        }
+
+    }
+
+    static class DM
+    {
+        public static Int32 NewClient(Int32 cMixInstanceID,
+            Byte[] codenameIdentity, String secretPassphrase)
+        {
+            GoSlice id = NewGoSlice(codenameIdentity);
+            Console.WriteLine("SecretNew: " + secretPassphrase);
+            GoString secret = NewGoString(secretPassphrase);
+            cmix_dm_NewDMClient_return ret = XXDK.cmix_dm_NewDMClient(
+                cMixInstanceID, id, secret);
+
+            FreeGoSlice(id);
+            FreeGoString(secret);
+
+            GoError err = ret.Err;
+            if (err.IsError != 0)
+            {
+                String errMsg = ConvertCharPtr(err.Msg, err.MsgLen);
+                throw new Exception(errMsg);
+            }
+            return ret.DMInstanceID;
+        }
+        public static UInt32 GetToken(Int32 dmInstanceID)
+        {
+            cmix_dm_GetDMToken_return ret = XXDK.cmix_dm_GetDMToken(
+                dmInstanceID);
+            GoError err = ret.Err;
+            if (err.IsError != 0)
+            {
+                String errMsg = ConvertCharPtr(err.Msg, err.MsgLen);
+                throw new Exception(errMsg);
+            }
+            return ret.Token;
+        }
+        public static Byte[] GetPubKey(Int32 dmInstanceID)
+        {
+            cmix_dm_GetDMPubKey_return ret = XXDK.cmix_dm_GetDMPubKey(
+                dmInstanceID);
+            GoError err = ret.Err;
+            if (err.IsError != 0)
+            {
+                String errMsg = ConvertCharPtr(err.Msg, err.MsgLen);
+                throw new Exception(errMsg);
+            }
+            return GoByteSliceToBytes(ret.PubKey);
+        }
+        public static Byte[] SendText(Int32 dmInstanceID,
+            Byte[] partnerPubKey, UInt32 dmToken,
+            String message, Int64 leaseTimeMS, Byte[] cmixParamsJSON)
+        {
+            GoSlice partnerKey = NewGoSlice(partnerPubKey);
+            GoString goMsg = NewGoString(message);
+            GoSlice cmixParams = NewGoSlice(cmixParamsJSON);
+            cmix_dm_SendText_return ret = XXDK.cmix_dm_SendText(dmInstanceID,
+                partnerKey, dmToken, goMsg, leaseTimeMS, cmixParams);
+
+            GoError err = ret.Err;
+            if (err.IsError != 0)
+            {
+                String errMsg = ConvertCharPtr(err.Msg, err.MsgLen);
+                throw new Exception(errMsg);
+            }
+
+            FreeGoSlice(partnerKey);
+            FreeGoString(goMsg);
+            FreeGoSlice(cmixParams);
+
+            Byte[] sendReport = GoByteSliceToBytes(ret.SendReportJSON);
+            return sendReport;
+        }
+
     }
 
 
@@ -692,29 +761,42 @@ public unsafe class Program
 
         // cmix_GetReceptionID returns the current default reception ID
         [DllImport("libxxdk.so")]
-        public static extern cmix_GetReceptionID_return cmix_GetReceptionID(GoInt32 cMixInstanceID);
+        public static extern cmix_GetReceptionID_return cmix_GetReceptionID(
+            GoInt32 cMixInstanceID);
         [DllImport("libxxdk.so")]
-        public static extern cmix_EKVGet_return cmix_EKVGet(GoInt32 cMixInstanceID, GoString key);
+        public static extern cmix_EKVGet_return cmix_EKVGet(
+            GoInt32 cMixInstanceID, GoString key);
         [DllImport("libxxdk.so")]
-        public static extern GoError cmix_EKVSet(GoInt32 cMixInstanceID, GoString key, GoSlice value);
+        public static extern GoError cmix_EKVSet(GoInt32 cMixInstanceID,
+            GoString key, GoSlice value);
         [DllImport("libxxdk.so")]
-        public static extern GoError cmix_StartNetworkFollower(GoInt cMixInstanceID, GoInt timeoutMS);
+        public static extern GoError cmix_StartNetworkFollower(
+            GoInt32 cMixInstanceID, GoInt timeoutMS);
         [DllImport("libxxdk.so")]
-        public static extern GoError cmix_StopNetworkFollower(GoInt cMixInstanceID);
+        public static extern GoError cmix_StopNetworkFollower(
+            GoInt32 cMixInstanceID);
         [DllImport("libxxdk.so")]
-        public static extern GoError cmix_WaitForNetwork(GoInt cMixInstanceID, GoInt timeoutMS);
+        public static extern GoError cmix_WaitForNetwork(GoInt32 cMixInstanceID,
+            GoInt timeoutMS);
         [DllImport("libxxdk.so")]
-        public static extern GoUint8 cmix_ReadyToSend(GoInt cMixInstanceID);
+        public static extern GoUint8 cmix_ReadyToSend(GoInt32 cMixInstanceID);
         [DllImport("libxxdk.so")]
-        public static extern GoSlice cmix_GenerateCodenameIdentity(GoString secretPassphrase);
+        public static extern GoByteSlice cmix_GenerateCodenameIdentity(
+            GoString secretPassphrase);
         [DllImport("libxxdk.so")]
-        public static extern cmix_dm_NewDMClient_return cmix_dm_NewDMClient(GoInt cMixInstanceID, GoSlice codenameIdentity, GoString secretPassphrase);
+        public static extern cmix_dm_NewDMClient_return cmix_dm_NewDMClient(
+            GoInt32 cMixInstanceID, GoSlice codenameIdentity,
+            GoString secretPassphrase);
         [DllImport("libxxdk.so")]
-        public static extern cmix_dm_GetDMToken_return cmix_dm_GetDMToken(GoInt dmInstanceID);
+        public static extern cmix_dm_GetDMToken_return cmix_dm_GetDMToken(
+            GoInt32 dmInstanceID);
         [DllImport("libxxdk.so")]
-        public static extern cmix_dm_GetDMPubKey_return cmix_dm_GetDMPubKey(GoInt dmInstanceID);
+        public static extern cmix_dm_GetDMPubKey_return cmix_dm_GetDMPubKey(
+            GoInt32 dmInstanceID);
         [DllImport("libxxdk.so")]
-        public static extern cmix_dm_SendText_return cmix_dm_SendText(GoInt dmInstanceID, GoSlice partnerPubKey, GoUint32 dmToken, GoString message, GoInt64 leaseTimeMS, GoSlice cmixParamsJSON);
+        public static extern cmix_dm_SendText_return cmix_dm_SendText(
+            GoInt32 dmInstanceID, GoSlice partnerPubKey, GoUint32 dmToken,
+            GoString message, GoInt64 leaseTimeMS, GoSlice cmixParamsJSON);
 
     }
 
