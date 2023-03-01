@@ -10,6 +10,11 @@ using System.CommandLine;
 
 namespace xxDK;
 
+/// <summary>
+/// Go Data Structures
+/// </summary>
+///
+// Mappable system types
 using GoInt8 = System.SByte;
 using GoUint8 = System.Byte;
 using GoInt16 = System.Int16;
@@ -24,89 +29,119 @@ using GoUintptr = System.UIntPtr;
 using GoFloat32 = System.Single;
 using GoFloat64 = System.Double;
 
+// GoString represents a String in
+// golang and allows us to pass strings to
+// the external shared library function as
+// parameter values.
+struct GoString
+{
+    public IntPtr p;
+    public Int64 n;
+}
+
+// GoSlice represents
+// a slice in golang so that we
+// can pass slices to the go external
+// shared library.
+struct GoSlice
+{
+    public IntPtr data;
+    public Int64 len;
+    public Int64 cap;
+}
+
+// GoInterface represents an error object in golang. 
+[StructLayout(LayoutKind.Sequential)]
+struct GoError
+{
+    public Int32 IsError;
+    public IntPtr Msg;
+    public Int32 MsgLen;
+}
+/* Return type for LoadCmix */
+[StructLayout(LayoutKind.Sequential)]
+struct LoadCmix_return
+{
+    public GoInt32 cMixInstanceID;
+    public GoError Err;
+}
+/* Return type for cmix_GetReceptionID */
+[StructLayout(LayoutKind.Sequential)]
+struct cmix_GetReceptionID_return
+{
+    public GoSlice r0;
+    public GoError r1;
+}
+/* Return type for cmix_EKVGet */
+[StructLayout(LayoutKind.Sequential)]
+struct cmix_EKVGet_return
+{
+    public GoSlice r0;
+    public GoError r1;
+}
+/* Return type for cmix_dm_NewDMClient */
+[StructLayout(LayoutKind.Sequential)]
+struct cmix_dm_NewDMClient_return
+{
+    public GoInt r0;
+    public GoError r1;
+}
+/* Return type for cmix_dm_GetDMToken */
+[StructLayout(LayoutKind.Sequential)]
+struct cmix_dm_GetDMToken_return
+{
+    public GoUint32 r0;
+    public GoError r1;
+}
+/* Return type for cmix_dm_GetDMPubKey */
+[StructLayout(LayoutKind.Sequential)]
+struct cmix_dm_GetDMPubKey_return
+{
+    public GoSlice r0;
+    public GoError r1;
+}
+/* Return type for cmix_dm_SendText */
+[StructLayout(LayoutKind.Sequential)]
+struct cmix_dm_SendText_return
+{
+    public GoSlice r0;
+    public GoError r1;
+}
+
 public unsafe class Program
 {
-    /// <summary>
-    /// Go Data Structures
-    /// </summary>
+    private static GoString NewGoString(String newString)
+    {
+        // Allocate unmanaged memory for the
+        // GoString
+        GoString s = new GoString
+        {
+            p = Marshal.StringToHGlobalAnsi(newString),
+            n = newString.Length
+        };
+        return s;
+    }
+    private static void FreeGoString(GoString freeMe)
+    {
+        Marshal.FreeHGlobal(freeMe.p);
+    }
+    private static GoSlice NewGoSlice(Byte[] data)
+    {
+        // Allocate unmanaged memory for
+        // the GoSlice
+        int n = data.Length;
 
-
-    // GoString represents a String in
-    // golang and allows us to pass strings to
-    // the external shared library function as
-    // parameter values.
-    struct GoString
-    {
-        public IntPtr p;
-        public Int64 n;
+        GoSlice gs = new GoSlice
+        {
+            data = Marshal.AllocHGlobal(n),
+            cap = n,
+            len = n
+        };
+        return gs;
     }
-
-    // GoSlice represents
-    // a slice in golang so that we
-    // can pass slices to the go external
-    // shared library.
-    struct GoSlice
+    private static void FreeGoSlice(GoSlice freeMe)
     {
-        public IntPtr data;
-        public Int64 len;
-        public Int64 cap;
-    }
-
-    // GoInterface represents an error object in golang. 
-    [StructLayout(LayoutKind.Sequential)]
-    struct GoError
-    {
-        public Int32 IsError;
-        public GoString Msg;
-    }
-    /* Return type for LoadCmix */
-    [StructLayout(LayoutKind.Sequential)]
-    struct LoadCmix_return
-    {
-        GoInt32 r0;
-        GoError r1;
-    }
-    /* Return type for cmix_GetReceptionID */
-    [StructLayout(LayoutKind.Sequential)]
-    struct cmix_GetReceptionID_return
-    {
-        GoSlice r0;
-        GoError r1;
-    }
-    /* Return type for cmix_EKVGet */
-    [StructLayout(LayoutKind.Sequential)]
-    struct cmix_EKVGet_return
-    {
-        GoSlice r0;
-        GoError r1;
-    }
-    /* Return type for cmix_dm_NewDMClient */
-    [StructLayout(LayoutKind.Sequential)]
-    struct cmix_dm_NewDMClient_return
-    {
-        GoInt r0;
-        GoError r1;
-    }
-    /* Return type for cmix_dm_GetDMToken */
-    [StructLayout(LayoutKind.Sequential)]
-    struct cmix_dm_GetDMToken_return
-    {
-        GoUint32 r0;
-        GoError r1;
-    }
-    /* Return type for cmix_dm_GetDMPubKey */
-    [StructLayout(LayoutKind.Sequential)]
-    struct cmix_dm_GetDMPubKey_return
-    {
-        GoSlice r0;
-        GoError r1;
-    }
-    /* Return type for cmix_dm_SendText */
-    [StructLayout(LayoutKind.Sequential)]
-    struct cmix_dm_SendText_return
-    {
-        GoSlice r0;
-        GoError r1;
+        Marshal.FreeHGlobal(freeMe.data);
     }
 
     /// <summary>
@@ -215,9 +250,9 @@ public unsafe class Program
         DMUpdateSentStatusCallbackFn updateSentStatusFn = DMUpdateSentStatus;
     }
 
-    static void Main(string? ndfJSON = null, string? stateDir = null)
+    static void Main(string? ndf = null, string? stateDir = null)
     {
-        if (string.IsNullOrWhiteSpace(ndfJSON))
+        if (string.IsNullOrWhiteSpace(ndf))
         {
             Console.WriteLine("Please provide an ndf json file");
             return;
@@ -229,46 +264,21 @@ public unsafe class Program
             return;
         }
 
-        Console.WriteLine($"Endpoint: {ndfJSON}");
-        Console.WriteLine($"Build Version: {stateDir}");
+        String ndfJSON = System.IO.File.ReadAllText(ndf);
+
         // CGO checks
         // Go code may not store a Go pointer in C memory. 
         // C code may store Go pointers in C memory, 
         // subject to the rule above: it must stop storing the Go pointer when 
         // the C function returns.
-
         Environment.SetEnvironmentVariable("GODEBUG", "cgocheck=2");
 
+        // Setup DMReceiver Callbacks with the library.
         DMReceiverCallbackFunctions CBs = new DMReceiverCallbackFunctions();
         XXDK.cmix_dm_set_callbacks(CBs);
-        // define parameters
         /*
-        int a = 10;
-        int b = 2;
-        double x = 100;
-        Int64[] t = new Int64[] { 35, 56, 1, 3, 2, 88, 14 };
 
-        // Allocate unmanaged memory for
-        // the GoSlice
 
-        int n = t.Length;
-        GCHandle h = GCHandle.Alloc(t, GCHandleType.Pinned);
-        GoSlice gs = new GoSlice
-        {
-            data = h.AddrOfPinnedObject(),
-            cap = n,
-            len = n
-        };
-
-        // Allocate unmanaged memory for the
-        // GoString
-
-        string msg = "I am the Hal 9000";
-        GoString s = new GoString
-        {
-            p = Marshal.StringToHGlobalAnsi(msg),
-            n = msg.Length
-        };
 
         // call the external functions
 
@@ -333,7 +343,13 @@ public unsafe class Program
         myver = XXDK.GetVersion();
         Console.WriteLine($"xxdk-client version: {ConvertGoString(myver)}");
 
-
+        Byte[] secret = Encoding.UTF8.GetBytes("Hello");
+        Byte[] cMixParamsJSON = Encoding.UTF8.GetBytes("");
+        if (!Directory.Exists(stateDir))
+        {
+            cMix.NewCmix(ndfJSON, stateDir, secret, "");
+        }
+        int cMixID = cMix.LoadCmix(stateDir, secret, cMixParamsJSON);
         /*
         cmixParams, _:= initParams()
 
@@ -535,6 +551,11 @@ public unsafe class Program
     {
         return Marshal.PtrToStringAnsi(gs.p, unchecked((int)gs.n));
     }
+    private static string ConvertCharPtr(IntPtr buf, Int32 len)
+    {
+        return Marshal.PtrToStringAnsi(buf, len);
+    }
+
 
     // Prints an Int64 array to a pretty string
     private static string Int64ArrayToString(Int64[] arr)
@@ -561,6 +582,58 @@ public unsafe class Program
         }
 
         return strBuilder.ToString();
+    }
+
+    static class cMix
+    {
+        public static void NewCmix(String ndfJSON,
+            String storageDir, Byte[] password,
+            string registrationCode)
+        {
+            GoString ndfJSONGS = NewGoString(ndfJSON);
+            GoString storageDirGS = NewGoString(storageDir);
+            GoSlice secret = NewGoSlice(password);
+            GoString regCode = NewGoString(registrationCode);
+
+            GoError err = XXDK.NewCmix(ndfJSONGS, storageDirGS, secret,
+                regCode);
+
+            FreeGoSlice(secret);
+            FreeGoString(regCode);
+            FreeGoString(ndfJSONGS);
+            FreeGoString(storageDirGS);
+
+            if (err.IsError != 0)
+            {
+                String errMsg = ConvertCharPtr(err.Msg, err.MsgLen);
+                throw new Exception(errMsg);
+            }
+
+        }
+
+        public static int LoadCmix(String storageDir, Byte[] password,
+            Byte[] cmixParamsJSON)
+        {
+            GoString storageDirGS = NewGoString(storageDir);
+            GoSlice secret = NewGoSlice(password);
+            GoSlice cmixParams = NewGoSlice(cmixParamsJSON);
+
+            LoadCmix_return ret = XXDK.LoadCmix(storageDirGS, secret,
+                cmixParams);
+
+            FreeGoSlice(cmixParams);
+            FreeGoSlice(secret);
+            FreeGoString(storageDirGS);
+
+            GoError err = ret.Err;
+            if (err.IsError != 0)
+            {
+                String errMsg = ConvertCharPtr(err.Msg, err.MsgLen);
+                throw new Exception(errMsg);
+            }
+
+            return ret.cMixInstanceID;
+        }
     }
 
 
@@ -613,7 +686,8 @@ public unsafe class Program
         // cause data corruption. In most cases only 1 instance should ever be
         // needed.
         [DllImport("libxxdk.so")]
-        public static extern LoadCmix_return LoadCmix(GoString storageDir, GoSlice password, GoSlice cmixParamsJSON);
+        public static extern LoadCmix_return LoadCmix(GoString storageDir,
+            GoSlice password, GoSlice cmixParamsJSON);
 
 
         // cmix_GetReceptionID returns the current default reception ID

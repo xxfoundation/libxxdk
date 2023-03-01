@@ -11,8 +11,9 @@ package main
 // #cgo CFLAGS: -I .
 //
 // typedef struct {
-//	int IsError;
-//	_GoString_ Msg;
+//	int   IsError;
+//	char* Msg;
+//      int   MsgLen;
 // } GoError;
 //
 // // below are the callbacks defined in callbacks.go
@@ -70,10 +71,17 @@ const (
 )
 
 func makeError(e error) C.GoError {
-	if e == nil {
-		return C.GoError{IsError: C.int(0), Msg: ""}
+	isErr := 0
+	Msg := ""
+	if e != nil {
+		isErr = 1
+		Msg = fmt.Sprintf("%+v", e)
 	}
-	return C.GoError{IsError: C.int(1), Msg: fmt.Sprintf("%+v", e)}
+	return C.GoError{
+		IsError: C.int(isErr),
+		Msg:     C.CString(Msg),
+		MsgLen:  C.int(len(Msg)),
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -112,8 +120,9 @@ func GetDependencies() string {
 //
 //export NewCmix
 func NewCmix(ndfJSON, storageDir string, password []byte,
-	registrationCode string) error {
-	return bindings.NewCmix(ndfJSON, storageDir, password, registrationCode)
+	registrationCode string) C.GoError {
+	err := bindings.NewCmix(ndfJSON, storageDir, password, registrationCode)
+	return makeError(err)
 }
 
 // LoadCmix will load an existing user storage from the storageDir using the
