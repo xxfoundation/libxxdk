@@ -16,6 +16,11 @@ package main
 //      int   MsgLen;
 // } GoError;
 //
+// typedef struct {
+//      int   len;
+//      void* data;
+// } GoByteSlice;
+//
 // // below are the callbacks defined in callbacks.go
 // extern long cmix_dm_receive(int dm_instance_id,
 //    void* mesage_id, int message_id_len,
@@ -56,6 +61,7 @@ import "C"
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
@@ -81,6 +87,13 @@ func makeError(e error) C.GoError {
 		IsError: C.int(isErr),
 		Msg:     C.CString(Msg),
 		MsgLen:  C.int(len(Msg)),
+	}
+}
+
+func makeBytes(s []byte) C.GoByteSlice {
+	return C.GoByteSlice{
+		len:  C.int(len(s)),
+		data: C.CBytes(s),
 	}
 }
 
@@ -145,7 +158,16 @@ func NewCmix(ndfJSON, storageDir string, password []byte,
 //export LoadCmix
 func LoadCmix(storageDir string, password []byte, cmixParamsJSON []byte) (int32,
 	C.GoError) {
-	instance, err := bindings.LoadCmix(storageDir, password, cmixParamsJSON)
+	// NOTE: we copy here because the elements need to persist.
+	// We assume everything is freed after use when sent over the
+	// c lib boundary.
+	storageDirCpy := strings.Clone(storageDir)
+	secret := make([]byte, len(password))
+	copy(secret, password)
+	cmixParams := make([]byte, len(cmixParamsJSON))
+	copy(cmixParams, cmixParamsJSON)
+
+	instance, err := bindings.LoadCmix(storageDirCpy, secret, cmixParams)
 	if err != nil {
 		return -1, makeError(err)
 	}
@@ -155,24 +177,26 @@ func LoadCmix(storageDir string, password []byte, cmixParamsJSON []byte) (int32,
 // cmix_GetReceptionID returns the current default reception ID
 //
 //export cmix_GetReceptionID
-func cmix_GetReceptionID(cMixInstanceID int32) ([]byte, C.GoError) {
+func cmix_GetReceptionID(cMixInstanceID int32) (C.GoByteSlice, C.GoError) {
 	cMix, ok := bindings.GetCMixInstance(int(cMixInstanceID))
 	if !ok {
-		return nil, makeError(errors.Errorf(ErrInvalidCMixInstanceID,
-			cMixInstanceID))
+		return makeBytes(nil),
+			makeError(errors.Errorf(ErrInvalidCMixInstanceID,
+				cMixInstanceID))
 	}
-	return cMix.GetReceptionID(), makeError(nil)
+	return makeBytes(cMix.GetReceptionID()), makeError(nil)
 }
 
 //export cmix_EKVGet
-func cmix_EKVGet(cMixInstanceID int32, key string) ([]byte, C.GoError) {
+func cmix_EKVGet(cMixInstanceID int32, key string) (C.GoByteSlice, C.GoError) {
 	cMix, ok := bindings.GetCMixInstance(int(cMixInstanceID))
 	if !ok {
-		return nil, makeError(errors.Errorf(ErrInvalidCMixInstanceID,
-			cMixInstanceID))
+		return makeBytes(nil),
+			makeError(errors.Errorf(ErrInvalidCMixInstanceID,
+				cMixInstanceID))
 	}
 	val, err := cMix.EKVGet(key)
-	return val, makeError(err)
+	return makeBytes(val), makeError(err)
 }
 
 //export cmix_EKVSet
@@ -186,9 +210,9 @@ func cmix_EKVSet(cMixInstanceID int32, key string, value []byte) C.GoError {
 }
 
 //export cmix_StartNetworkFollower
-func cmix_StartNetworkFollower(cMixInstanceID, timeoutMS int) C.GoError {
-	cmix, ok := bindings.GetCMixInstance(cMixInstanceID)
-	if ok {
+func cmix_StartNetworkFollower(cMixInstanceID int32, timeoutMS int) C.GoError {
+	cmix, ok := bindings.GetCMixInstance(int(cMixInstanceID))
+	if !ok {
 		return makeError(errors.Errorf(ErrInvalidCMixInstanceID,
 			cMixInstanceID))
 	}
@@ -196,9 +220,9 @@ func cmix_StartNetworkFollower(cMixInstanceID, timeoutMS int) C.GoError {
 }
 
 //export cmix_StopNetworkFollower
-func cmix_StopNetworkFollower(cMixInstanceID int) C.GoError {
-	cmix, ok := bindings.GetCMixInstance(cMixInstanceID)
-	if ok {
+func cmix_StopNetworkFollower(cMixInstanceID int32) C.GoError {
+	cmix, ok := bindings.GetCMixInstance(int(cMixInstanceID))
+	if !ok {
 		return makeError(errors.Errorf(ErrInvalidCMixInstanceID,
 			cMixInstanceID))
 	}
@@ -206,9 +230,9 @@ func cmix_StopNetworkFollower(cMixInstanceID int) C.GoError {
 }
 
 //export cmix_WaitForNetwork
-func cmix_WaitForNetwork(cMixInstanceID, timeoutMS int) C.GoError {
-	cmix, ok := bindings.GetCMixInstance(cMixInstanceID)
-	if ok {
+func cmix_WaitForNetwork(cMixInstanceID int32, timeoutMS int) C.GoError {
+	cmix, ok := bindings.GetCMixInstance(int(cMixInstanceID))
+	if !ok {
 		return makeError(errors.Errorf(ErrInvalidCMixInstanceID,
 			cMixInstanceID))
 	}
@@ -221,9 +245,9 @@ func cmix_WaitForNetwork(cMixInstanceID, timeoutMS int) C.GoError {
 }
 
 //export cmix_ReadyToSend
-func cmix_ReadyToSend(cMixInstanceID int) bool {
-	cmix, ok := bindings.GetCMixInstance(cMixInstanceID)
-	if ok {
+func cmix_ReadyToSend(cMixInstanceID int32) bool {
+	cmix, ok := bindings.GetCMixInstance(int(cMixInstanceID))
+	if !ok {
 		jww.ERROR.Printf(ErrInvalidCMixInstanceID, cMixInstanceID)
 		return false
 	}
@@ -237,7 +261,7 @@ func cmix_ReadyToSend(cMixInstanceID int) bool {
 ////////////////////////////////////////////////////////////////////////////////
 
 //export cmix_GenerateCodenameIdentity
-func cmix_GenerateCodenameIdentity(secretPassphrase string) []byte {
+func cmix_GenerateCodenameIdentity(secretPassphrase string) C.GoByteSlice {
 	// TODO: maybe a singleton or init func to this? is there a better
 	// way to do this? would it ever make sense to take an RNG
 	// from C?
@@ -252,14 +276,16 @@ func cmix_GenerateCodenameIdentity(secretPassphrase string) []byte {
 	if err != nil {
 		jww.FATAL.Panicf("%+v", err)
 	}
-	return cnBytes
+	jww.TRACE.Printf("Codename: %s", string(cnBytes))
+	return makeBytes(cnBytes)
 }
 
 var dmReceivers map[int]*dmReceiver
 
 //export cmix_dm_NewDMClient
-func cmix_dm_NewDMClient(cMixInstanceID int, codenameIdentity []byte,
-	secretPassphrase string) (int, C.GoError) {
+func cmix_dm_NewDMClient(cMixInstanceID int32, codenameIdentity []byte,
+	secretPassphrase string) (int32, C.GoError) {
+	jww.TRACE.Printf("Received Codename: %s", string(codenameIdentity))
 	pi, err := codename.ImportPrivateIdentity(secretPassphrase,
 		codenameIdentity)
 	if err != nil {
@@ -267,7 +293,7 @@ func cmix_dm_NewDMClient(cMixInstanceID int, codenameIdentity []byte,
 	}
 	myReceiver := &dmReceiver{}
 	receiver := bindings.NewDMReceiver(myReceiver)
-	dmClient, err := bindings.NewDMClientWithGoEventModel(cMixInstanceID,
+	dmClient, err := bindings.NewDMClientWithGoEventModel(int(cMixInstanceID),
 		pi.Marshal(), receiver)
 	if err != nil {
 		return -1, makeError(err)
@@ -280,12 +306,12 @@ func cmix_dm_NewDMClient(cMixInstanceID int, codenameIdentity []byte,
 	cid := dmClient.GetID()
 	myReceiver.dmClientID = cid
 	dmReceivers[cid] = myReceiver
-	return cid, makeError(nil)
+	return int32(cid), makeError(nil)
 }
 
 //export cmix_dm_GetDMToken
-func cmix_dm_GetDMToken(dmInstanceID int) (uint32, C.GoError) {
-	dmClient, ok := bindings.GetDMInstance(dmInstanceID)
+func cmix_dm_GetDMToken(dmInstanceID int32) (uint32, C.GoError) {
+	dmClient, ok := bindings.GetDMInstance(int(dmInstanceID))
 	if !ok {
 		return 0, makeError(errors.Errorf(ErrInvalidDMInstanceID,
 			dmInstanceID))
@@ -294,27 +320,29 @@ func cmix_dm_GetDMToken(dmInstanceID int) (uint32, C.GoError) {
 }
 
 //export cmix_dm_GetDMPubKey
-func cmix_dm_GetDMPubKey(dmInstanceID int) ([]byte, C.GoError) {
-	dmClient, ok := bindings.GetDMInstance(dmInstanceID)
+func cmix_dm_GetDMPubKey(dmInstanceID int32) (C.GoByteSlice, C.GoError) {
+	dmClient, ok := bindings.GetDMInstance(int(dmInstanceID))
 	if !ok {
-		return nil, makeError(errors.Errorf(ErrInvalidDMInstanceID,
-			dmInstanceID))
+		return makeBytes(nil),
+			makeError(errors.Errorf(ErrInvalidDMInstanceID,
+				dmInstanceID))
 	}
-	return dmClient.GetPublicKey(), makeError(nil)
+	return makeBytes(dmClient.GetPublicKey()), makeError(nil)
 }
 
 //export cmix_dm_SendText
-func cmix_dm_SendText(dmInstanceID int, partnerPubKey []byte,
+func cmix_dm_SendText(dmInstanceID int32, partnerPubKey []byte,
 	dmToken uint32, message string, leaseTimeMS int64,
-	cmixParamsJSON []byte) ([]byte, C.GoError) {
-	dmClient, ok := bindings.GetDMInstance(dmInstanceID)
+	cmixParamsJSON []byte) (C.GoByteSlice, C.GoError) {
+	dmClient, ok := bindings.GetDMInstance(int(dmInstanceID))
 	if !ok {
-		return nil, makeError(errors.Errorf(ErrInvalidDMInstanceID,
-			dmInstanceID))
+		return makeBytes(nil),
+			makeError(errors.Errorf(ErrInvalidDMInstanceID,
+				dmInstanceID))
 	}
-	msgID, err := dmClient.SendText(partnerPubKey, dmToken,
+	sendReportJSON, err := dmClient.SendText(partnerPubKey, dmToken,
 		message, leaseTimeMS, cmixParamsJSON)
-	return msgID, makeError(err)
+	return makeBytes(sendReportJSON), makeError(err)
 }
 
 // This implements the bindings.DMReceiver interface.
