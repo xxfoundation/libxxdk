@@ -7,6 +7,7 @@ using System.Runtime.Intrinsics.X86;
 using System.Security.Principal;
 using System.Text;
 using System.CommandLine;
+using System.Reflection.PortableExecutable;
 
 namespace XX;
 
@@ -497,6 +498,20 @@ public unsafe class Network
         return Marshal.PtrToStringUTF8(buf, len);
     }
 
+    private static string ConvertCChar(char* buf, Int32 len)
+    {
+        return Marshal.PtrToStringUTF8((IntPtr)buf, len);
+    }
+
+    private static Byte[] ConvertCVoid(void* buf, Int32 len)
+    {
+        Int32 n = unchecked((int)(len));
+        Byte[] res = new Byte[n];
+        Marshal.Copy((IntPtr)buf, res, 0, n);
+        return res;
+    }
+
+
     private static GoString NewGoString(String newString)
     {
         // Allocate unmanaged memory for the
@@ -601,7 +616,10 @@ public unsafe class Network
         int dmToken, int codeset,
         long timestamp, long round_id, long msg_type, long status)
     {
-        Console.WriteLine("DMReceive");
+        Byte[] PubKey = ConvertCVoid(pubkey, pubkey_len);
+        Byte[] Message = ConvertCVoid(text, text_len);
+        Console.WriteLine("DMReceive: { 0}, { 1}: { 2}",
+            System.Convert.ToBase64String(PubKey), dmToken, Message);
         return 0;
     }
     /// <summary>
@@ -615,7 +633,10 @@ public unsafe class Network
         int dmToken, int codeset,
         long timestamp, long round_id, long status)
     {
-        Console.WriteLine("DMReceiveText");
+        Byte[] PubKey = ConvertCVoid(pubkey, pubkey_len);
+        String Message = ConvertCChar(text, text_len);
+        Console.WriteLine("DMReceiveText: {0}, {1}: {2}",
+            System.Convert.ToBase64String(PubKey), dmToken, Message);
         return 0;
     }
     /// <summary>
@@ -630,7 +651,10 @@ public unsafe class Network
         int dmToken, int codeset,
         long timestamp, long round_id, long status)
     {
-        Console.WriteLine("DMReceiveReply");
+        Byte[] PubKey = ConvertCVoid(pubkey, pubkey_len);
+        String Message = ConvertCChar(text, text_len);
+        Console.WriteLine("DMReceiveReply {0}, {1}: {2}",
+            System.Convert.ToBase64String(PubKey), dmToken, Message);
         return 0;
     }
     /// <summary>
@@ -645,7 +669,10 @@ public unsafe class Network
         int dmToken, int codeset,
         long timestamp, long round_id, long status)
     {
-        Console.WriteLine("DMReceiveReaction");
+        Byte[] PubKey = ConvertCVoid(pubkey, pubkey_len);
+        String Message = ConvertCChar(text, text_len);
+        Console.WriteLine("DMReceiveReaction {0}, {1}: {2}",
+            System.Convert.ToBase64String(PubKey), dmToken, Message);
         return 0;
     }
     /// <summary>
@@ -656,7 +683,9 @@ public unsafe class Network
         void* message_id, int message_id_len, long timestamp,
         long round_id, long status)
     {
-        Console.WriteLine("DMUpdateSentStatus");
+        Byte[] MsgID = ConvertCVoid(message_id, message_id_len);
+        Console.WriteLine("DMUpdateSentStatus {0}: {1}",
+            System.Convert.ToBase64String(MsgID), status);
         return 0;
     }
 
