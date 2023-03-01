@@ -10,6 +10,11 @@ package main
 // #include "callbacks.h"
 // #cgo CFLAGS: -I .
 //
+// typedef struct {
+//	int IsError;
+//	_GoString_ Msg;
+// } GoError;
+//
 // // below are the callbacks defined in callbacks.go
 // extern long cmix_dm_receive(int dm_instance_id,
 //    void* mesage_id, int message_id_len,
@@ -49,6 +54,8 @@ package main
 import "C"
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/client/v4/bindings"
@@ -61,6 +68,13 @@ const (
 	ErrInvalidCMixInstanceID = "Invalid cMix Instance ID: %d"
 	ErrInvalidDMInstanceID   = "Invalid DM Instance ID: %d"
 )
+
+func makeError(e error) C.GoError {
+	if e == nil {
+		return C.GoError{IsError: C.int(0), Msg: ""}
+	}
+	return C.GoError{IsError: C.int(1), Msg: fmt.Sprintf("%+v", e)}
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                                                            //
@@ -121,75 +135,80 @@ func NewCmix(ndfJSON, storageDir string, password []byte,
 //
 //export LoadCmix
 func LoadCmix(storageDir string, password []byte, cmixParamsJSON []byte) (int32,
-	error) {
+	C.GoError) {
 	instance, err := bindings.LoadCmix(storageDir, password, cmixParamsJSON)
 	if err != nil {
-		return -1, err
+		return -1, makeError(err)
 	}
-	return int32(instance.GetID()), nil
+	return int32(instance.GetID()), makeError(nil)
 }
 
 // cmix_GetReceptionID returns the current default reception ID
 //
 //export cmix_GetReceptionID
-func cmix_GetReceptionID(cMixInstanceID int32) ([]byte, error) {
+func cmix_GetReceptionID(cMixInstanceID int32) ([]byte, C.GoError) {
 	cMix, ok := bindings.GetCMixInstance(int(cMixInstanceID))
 	if !ok {
-		return nil, errors.Errorf(ErrInvalidCMixInstanceID,
-			cMixInstanceID)
+		return nil, makeError(errors.Errorf(ErrInvalidCMixInstanceID,
+			cMixInstanceID))
 	}
-	return cMix.GetReceptionID(), nil
+	return cMix.GetReceptionID(), makeError(nil)
 }
 
 //export cmix_EKVGet
-func cmix_EKVGet(cMixInstanceID int32, key string) ([]byte, error) {
+func cmix_EKVGet(cMixInstanceID int32, key string) ([]byte, C.GoError) {
 	cMix, ok := bindings.GetCMixInstance(int(cMixInstanceID))
 	if !ok {
-		return nil, errors.Errorf(ErrInvalidCMixInstanceID,
-			cMixInstanceID)
+		return nil, makeError(errors.Errorf(ErrInvalidCMixInstanceID,
+			cMixInstanceID))
 	}
-	return cMix.EKVGet(key)
+	val, err := cMix.EKVGet(key)
+	return val, makeError(err)
 }
 
 //export cmix_EKVSet
-func cmix_EKVSet(cMixInstanceID int32, key string, value []byte) error {
+func cmix_EKVSet(cMixInstanceID int32, key string, value []byte) C.GoError {
 	cMix, ok := bindings.GetCMixInstance(int(cMixInstanceID))
 	if !ok {
-		return errors.Errorf(ErrInvalidCMixInstanceID,
-			cMixInstanceID)
+		return makeError(errors.Errorf(ErrInvalidCMixInstanceID,
+			cMixInstanceID))
 	}
-	return cMix.EKVSet(key, value)
+	return makeError(cMix.EKVSet(key, value))
 }
 
 //export cmix_StartNetworkFollower
-func cmix_StartNetworkFollower(cMixInstanceID, timeoutMS int) error {
+func cmix_StartNetworkFollower(cMixInstanceID, timeoutMS int) C.GoError {
 	cmix, ok := bindings.GetCMixInstance(cMixInstanceID)
 	if ok {
-		return errors.Errorf(ErrInvalidCMixInstanceID, cMixInstanceID)
+		return makeError(errors.Errorf(ErrInvalidCMixInstanceID,
+			cMixInstanceID))
 	}
-	return cmix.StartNetworkFollower(timeoutMS)
+	return makeError(cmix.StartNetworkFollower(timeoutMS))
 }
 
 //export cmix_StopNetworkFollower
-func cmix_StopNetworkFollower(cMixInstanceID int) error {
+func cmix_StopNetworkFollower(cMixInstanceID int) C.GoError {
 	cmix, ok := bindings.GetCMixInstance(cMixInstanceID)
 	if ok {
-		return errors.Errorf(ErrInvalidCMixInstanceID, cMixInstanceID)
+		return makeError(errors.Errorf(ErrInvalidCMixInstanceID,
+			cMixInstanceID))
 	}
-	return cmix.StopNetworkFollower()
+	return makeError(cmix.StopNetworkFollower())
 }
 
 //export cmix_WaitForNetwork
-func cmix_WaitForNetwork(cMixInstanceID, timeoutMS int) error {
+func cmix_WaitForNetwork(cMixInstanceID, timeoutMS int) C.GoError {
 	cmix, ok := bindings.GetCMixInstance(cMixInstanceID)
 	if ok {
-		return errors.Errorf(ErrInvalidCMixInstanceID, cMixInstanceID)
+		return makeError(errors.Errorf(ErrInvalidCMixInstanceID,
+			cMixInstanceID))
 	}
 	ok = cmix.WaitForNetwork(timeoutMS)
 	if !ok {
-		return errors.Errorf("Timed out waiting for network")
+		return makeError(errors.Errorf(
+			"Timed out waiting for network"))
 	}
-	return nil
+	return makeError(nil)
 }
 
 //export cmix_ReadyToSend
@@ -231,18 +250,18 @@ var dmReceivers map[int]*dmReceiver
 
 //export cmix_dm_NewDMClient
 func cmix_dm_NewDMClient(cMixInstanceID int, codenameIdentity []byte,
-	secretPassphrase string) (int, error) {
+	secretPassphrase string) (int, C.GoError) {
 	pi, err := codename.ImportPrivateIdentity(secretPassphrase,
 		codenameIdentity)
 	if err != nil {
-		return -1, err
+		return -1, makeError(err)
 	}
 	myReceiver := &dmReceiver{}
 	receiver := bindings.NewDMReceiver(myReceiver)
 	dmClient, err := bindings.NewDMClientWithGoEventModel(cMixInstanceID,
 		pi.Marshal(), receiver)
 	if err != nil {
-		return -1, err
+		return -1, makeError(err)
 	}
 
 	// Set up receiver tracking
@@ -252,40 +271,41 @@ func cmix_dm_NewDMClient(cMixInstanceID int, codenameIdentity []byte,
 	cid := dmClient.GetID()
 	myReceiver.dmClientID = cid
 	dmReceivers[cid] = myReceiver
-	return cid, nil
+	return cid, makeError(nil)
 }
 
 //export cmix_dm_GetDMToken
-func cmix_dm_GetDMToken(dmInstanceID int) (uint32, error) {
+func cmix_dm_GetDMToken(dmInstanceID int) (uint32, C.GoError) {
 	dmClient, ok := bindings.GetDMInstance(dmInstanceID)
 	if !ok {
-		return 0, errors.Errorf(ErrInvalidDMInstanceID,
-			dmInstanceID)
+		return 0, makeError(errors.Errorf(ErrInvalidDMInstanceID,
+			dmInstanceID))
 	}
-	return dmClient.GetToken(), nil
+	return dmClient.GetToken(), makeError(nil)
 }
 
 //export cmix_dm_GetDMPubKey
-func cmix_dm_GetDMPubKey(dmInstanceID int) ([]byte, error) {
+func cmix_dm_GetDMPubKey(dmInstanceID int) ([]byte, C.GoError) {
 	dmClient, ok := bindings.GetDMInstance(dmInstanceID)
 	if !ok {
-		return nil, errors.Errorf(ErrInvalidDMInstanceID,
-			dmInstanceID)
+		return nil, makeError(errors.Errorf(ErrInvalidDMInstanceID,
+			dmInstanceID))
 	}
-	return dmClient.GetPublicKey(), nil
+	return dmClient.GetPublicKey(), makeError(nil)
 }
 
 //export cmix_dm_SendText
 func cmix_dm_SendText(dmInstanceID int, partnerPubKey []byte,
 	dmToken uint32, message string, leaseTimeMS int64,
-	cmixParamsJSON []byte) ([]byte, error) {
+	cmixParamsJSON []byte) ([]byte, C.GoError) {
 	dmClient, ok := bindings.GetDMInstance(dmInstanceID)
 	if !ok {
-		return nil, errors.Errorf(ErrInvalidDMInstanceID,
-			dmInstanceID)
+		return nil, makeError(errors.Errorf(ErrInvalidDMInstanceID,
+			dmInstanceID))
 	}
-	return dmClient.SendText(partnerPubKey, dmToken,
+	msgID, err := dmClient.SendText(partnerPubKey, dmToken,
 		message, leaseTimeMS, cmixParamsJSON)
+	return msgID, makeError(err)
 }
 
 // This implements the bindings.DMReceiver interface.

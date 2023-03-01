@@ -18,4 +18,8 @@
     <None Include="bin\Debug\net7.0\libxxdk.h" />
     <None Include="bin\Debug\net7.0\libxxdk.so" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+    <PackageReference Include="System.CommandLine.DragonFruit" Version="0.4.0-alpha.22272.1" />
+  </ItemGroup>
 </Project>
