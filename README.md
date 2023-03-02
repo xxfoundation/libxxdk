@@ -4,15 +4,23 @@ with a simple C# library wrapper.
 Running and Testing
 ===================
 
+This is tested to run on MacOS (M1/Arm version) and Linux (Ubuntu
+x86_64). It should run on Windows but may need the library name
+changed.
+
 ```
 make -k
 cd xxdk.NET
-dotnet run --ndf mainnet-ndf.json --state-dir world | grep ^DM
+dotnet run --ndf mainnet-ndf.json --state-dir world --wait 20 | grep ^DM
 ```
 
 It's highly recommended to run with grep on the output. Especially on
 mainnet, logs can be noisy with failure to connect errors as it accesses
 the network.
+
+Once you've run once with dotnet (or built it), you can run the
+`dm.sh` shell script to have 2 clients talk to each other (or you can
+run it on your own).
 
 Main logic is in Program.cs, the xxdk library wrapper is in xxdk.cs.
 
