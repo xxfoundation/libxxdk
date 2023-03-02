@@ -561,7 +561,8 @@ public unsafe class Network
         void* message_id, int message_id_len,
         char* nickname, int nickname_len,
         void* text, int text_len,
-        void* pubkey, int pubkey_len,
+        void* partnerkey, int partnerkey_len,
+        void* senderkey, int senderkey_len,
         uint dmToken, int codeset,
         long timestamp, long round_id, long msg_type, long status);
     /// <summary>
@@ -571,7 +572,8 @@ public unsafe class Network
         void* mesage_id, int message_id_len,
         char* nickname, int nickname_len,
         char* text, int text_len,
-        void* pubkey, int pubkey_len,
+        void* partnerkey, int partnerkey_len,
+        void* senderkey, int senderkey_len,
         uint dmToken, int codeset,
         long timestamp, long round_id, long status);
     /// <summary>
@@ -582,7 +584,8 @@ public unsafe class Network
         void* reply_to, int reply_to_len,
         char* nickname, int nickname_len,
         char* text, int text_len,
-        void* pubkey, int pubkey_len,
+        void* partnerkey, int partnerkey_len,
+        void* senderkey, int senderkey_len,
         uint dmToken, int codeset,
         long timestamp, long round_id, long status);
     /// <summary>
@@ -593,7 +596,8 @@ public unsafe class Network
         void* reaction_to, int reaction_to_len,
         char* nickname, int nickname_len,
         char* text, int text_len,
-        void* pubkey, int pubkey_len,
+        void* partnerkey, int partnerkey_len,
+        void* senderkey, int senderkey_len,
         uint dmToken, int codeset,
         long timestamp, long round_id, long status);
     /// <summary>
@@ -612,14 +616,16 @@ public unsafe class Network
         void* message_id, int message_id_len,
         char* nickname, int nickname_len,
         void* text, int text_len,
-        void* pubkey, int pubkey_len,
+        void* partnerkey, int partnerkey_len,
+        void* senderkey, int senderkey_len,
         uint dmToken, int codeset,
         long timestamp, long round_id, long msg_type, long status)
     {
-        Byte[] PubKey = ConvertCVoid(pubkey, pubkey_len);
+        Byte[] partnerKey = ConvertCVoid(partnerkey, partnerkey_len);
+        Byte[] senderKey = ConvertCVoid(senderkey, senderkey_len);
         Byte[] Message = ConvertCVoid(text, text_len);
         Console.WriteLine("DMReceive: { 0}, { 1}: { 2}",
-            System.Convert.ToBase64String(PubKey), dmToken, Message);
+            System.Convert.ToBase64String(partnerKey), System.Convert.ToBase64String(senderKey), dmToken, Message);
         return 0;
     }
     /// <summary>
@@ -629,14 +635,17 @@ public unsafe class Network
         void* mesage_id, int message_id_len,
         char* nickname, int nickname_len,
         char* text, int text_len,
-        void* pubkey, int pubkey_len,
+        void* partnerkey, int partnerkey_len,
+        void* senderkey, int senderkey_len,
         uint dmToken, int codeset,
         long timestamp, long round_id, long status)
     {
-        Byte[] PubKey = ConvertCVoid(pubkey, pubkey_len);
+        Byte[] partnerKey = ConvertCVoid(partnerkey, partnerkey_len);
+        Byte[] senderKey = ConvertCVoid(senderkey, senderkey_len);
         String Message = ConvertCChar(text, text_len);
-        Console.WriteLine("DMReceiveText: {0}, {1}: {2}",
-            System.Convert.ToBase64String(PubKey), dmToken, Message);
+        Console.WriteLine("DMReceiveText: {0}->{1}, {2}: {3}",
+            System.Convert.ToBase64String(partnerKey),
+            System.Convert.ToBase64String(senderKey), dmToken, Message);
         return 0;
     }
     /// <summary>
@@ -647,14 +656,17 @@ public unsafe class Network
         void* reply_to, int reply_to_len,
         char* nickname, int nickname_len,
         char* text, int text_len,
-        void* pubkey, int pubkey_len,
+        void* partnerkey, int partnerkey_len,
+        void* senderkey, int senderkey_len,
         uint dmToken, int codeset,
         long timestamp, long round_id, long status)
     {
-        Byte[] PubKey = ConvertCVoid(pubkey, pubkey_len);
+        Byte[] partnerKey = ConvertCVoid(partnerkey, partnerkey_len);
+        Byte[] senderKey = ConvertCVoid(senderkey, senderkey_len);
         String Message = ConvertCChar(text, text_len);
-        Console.WriteLine("DMReceiveReply {0}, {1}: {2}",
-            System.Convert.ToBase64String(PubKey), dmToken, Message);
+        Console.WriteLine("DMReceiveReply {0}->{1}, {2}: {3}",
+            System.Convert.ToBase64String(partnerKey),
+            System.Convert.ToBase64String(senderKey), dmToken, Message);
         return 0;
     }
     /// <summary>
@@ -665,14 +677,17 @@ public unsafe class Network
         void* reaction_to, int reaction_to_len,
         char* nickname, int nickname_len,
         char* text, int text_len,
-        void* pubkey, int pubkey_len,
+        void* partnerkey, int partnerkey_len,
+        void* senderkey, int senderkey_len,
         uint dmToken, int codeset,
         long timestamp, long round_id, long status)
     {
-        Byte[] PubKey = ConvertCVoid(pubkey, pubkey_len);
+        Byte[] partnerKey = ConvertCVoid(partnerkey, partnerkey_len);
+        Byte[] senderKey = ConvertCVoid(senderkey, senderkey_len);
         String Message = ConvertCChar(text, text_len);
-        Console.WriteLine("DMReceiveReaction {0}, {1}: {2}",
-            System.Convert.ToBase64String(PubKey), dmToken, Message);
+        Console.WriteLine("DMReceiveReaction {0}->{1}, {2}: {3}",
+            System.Convert.ToBase64String(partnerKey),
+            System.Convert.ToBase64String(senderKey), dmToken, Message);
         return 0;
     }
     /// <summary>

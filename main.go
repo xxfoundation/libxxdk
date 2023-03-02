@@ -26,14 +26,16 @@ package main
 //    void* mesage_id, int message_id_len,
 //    char* nickname, int nickname_len,
 //    void* text, int text_len,
-//    void* pubkey, int pubkey_len,
+//    void* partnerkey, int partnerkey_len,
+//    void* senderkey, int senderkey_len,
 //    int dmToken, int codeset,
 //    long timestamp, long round_id, long message_type, long status);
 // extern long cmix_dm_receive_text(int dm_instance_id,
 //    void* message_id, int message_id_len,
 //    char* nickname, int nickname_len,
 //    char* text, int text_len,
-//    void* pubkey, int pubkey_len,
+//    void* partnerkey, int partnerkey_len,
+//    void* senderkey, int senderkey_len,
 //    int dmToken, int codeset,
 //    long timestamp, long round_id, long status);
 // extern long cmix_dm_receive_reply(int dm_instance_id,
@@ -41,7 +43,8 @@ package main
 //    void* reply_to, int reply_to_len,
 //    char* nickname, int nickname_len,
 //    char* text, int text_len,
-//    void* pubkey, int pubkey_len,
+//    void* partnerkey, int partnerkey_len,
+//    void* senderkey, int senderkey_len,
 //    int dmToken, int codeset,
 //    long timestamp, long round_id, long status);
 // extern long cmix_dm_receive_reaction(int dm_instance_id,
@@ -49,7 +52,8 @@ package main
 //    void* reaction_to, int reaction_to_len,
 //    char* nickname, int nickname_len,
 //    char* text, int text_len,
-//    void* pubkey, int pubkey_len,
+//    void* partnerkey, int partnerkey_len,
+//    void* senderkey, int senderkey_len,
 //    int dmToken, int codeset,
 //    long timestamp, long round_id, long status);
 // extern void cmix_dm_update_sent_status(int dm_instance_id,
@@ -351,54 +355,58 @@ type dmReceiver struct {
 }
 
 func (dmr *dmReceiver) Receive(messageID []byte, nickname string,
-	text []byte, pubKey []byte, dmToken int32, codeset int,
+	text []byte, partnerKey, senderKey []byte, dmToken int32, codeset int,
 	timestamp, roundId, mType, status int64) int64 {
 	return int64(C.cmix_dm_receive(C.int(dmr.dmClientID),
 		C.CBytes(messageID), C.int(len(messageID)),
 		C.CString(nickname), C.int(len(nickname)),
 		C.CBytes(text), C.int(len(text)),
-		C.CBytes(pubKey), C.int(len(pubKey)),
+		C.CBytes(partnerKey), C.int(len(partnerKey)),
+		C.CBytes(senderKey), C.int(len(senderKey)),
 		C.int(dmToken),
 		C.int(codeset), C.long(timestamp), C.long(roundId),
 		C.long(mType), C.long(status)))
 }
 
 func (dmr *dmReceiver) ReceiveText(messageID []byte,
-	nickname, text string, pubKey []byte, dmToken int32, codeset int,
+	nickname, text string, partnerKey, senderKey []byte, dmToken int32, codeset int,
 	timestamp, roundId, status int64) int64 {
 	return int64(C.cmix_dm_receive_text(C.int(dmr.dmClientID),
 		C.CBytes(messageID), C.int(len(messageID)),
 		C.CString(nickname), C.int(len(nickname)),
 		C.CString(text), C.int(len(text)),
-		C.CBytes(pubKey), C.int(len(pubKey)),
+		C.CBytes(partnerKey), C.int(len(partnerKey)),
+		C.CBytes(senderKey), C.int(len(senderKey)),
 		C.int(dmToken),
 		C.int(codeset), C.long(timestamp), C.long(roundId),
 		C.long(status)))
 }
 
 func (dmr *dmReceiver) ReceiveReply(messageID, replyTo []byte,
-	nickname, text string, pubKey []byte, dmToken int32,
+	nickname, text string, partnerKey, senderKey []byte, dmToken int32,
 	codeset int, timestamp, roundId, status int64) int64 {
 	return int64(C.cmix_dm_receive_reply(C.int(dmr.dmClientID),
 		C.CBytes(messageID), C.int(len(messageID)),
 		C.CBytes(replyTo), C.int(len(replyTo)),
 		C.CString(nickname), C.int(len(nickname)),
 		C.CString(text), C.int(len(text)),
-		C.CBytes(pubKey), C.int(len(pubKey)),
+		C.CBytes(partnerKey), C.int(len(partnerKey)),
+		C.CBytes(senderKey), C.int(len(senderKey)),
 		C.int(dmToken),
 		C.int(codeset), C.long(timestamp), C.long(roundId),
 		C.long(status)))
 }
 
 func (dmr *dmReceiver) ReceiveReaction(messageID, reactionTo []byte,
-	nickname, reaction string, pubKey []byte, dmToken int32,
+	nickname, reaction string, partnerKey, senderKey []byte, dmToken int32,
 	codeset int, timestamp, roundId, status int64) int64 {
 	return int64(C.cmix_dm_receive_reaction(C.int(dmr.dmClientID),
 		C.CBytes(messageID), C.int(len(messageID)),
 		C.CBytes(reactionTo), C.int(len(reactionTo)),
 		C.CString(nickname), C.int(len(nickname)),
 		C.CString(reaction), C.int(len(reaction)),
-		C.CBytes(pubKey), C.int(len(pubKey)),
+		C.CBytes(partnerKey), C.int(len(partnerKey)),
+		C.CBytes(senderKey), C.int(len(senderKey)),
 		C.int(dmToken),
 		C.int(codeset), C.long(timestamp), C.long(roundId),
 		C.long(status)))

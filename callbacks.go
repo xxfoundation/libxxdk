@@ -25,37 +25,41 @@ package main
 //    void* message_id, int message_id_len,
 //    char* nickname, int nickname_len,
 //    void* text, int text_len,
-//    void* pubkey, int pubkey_len,
+//    void* partnerkey, int partnerkey_len,
+//    void* senderkey, int senderkey_len,
 //    int dmToken, int codeset,
 //    long timestamp, long round_id, long msg_type, long status) {
 //    return DMReceiverCallbacks.receiveFn(dm_instance_id,
 //       message_id, message_id_len, nickname, nickname_len,
-//       text, text_len, pubkey, pubkey_len, dmToken, codeset,
-//       timestamp, round_id, msg_type, status);
+//       text, text_len, partnerkey, partnerkey_len, senderkey, senderkey_len,
+//       dmToken, codeset, timestamp, round_id, msg_type, status);
 // }
 // long cmix_dm_receive_text(int dm_instance_id,
 //    void* message_id, int message_id_len,
 //    char* nickname, int nickname_len,
 //    char* text, int text_len,
-//    void* pubkey, int pubkey_len,
+//    void* partnerkey, int partnerkey_len,
+//    void* senderkey, int senderkey_len,
 //    int dmToken, int codeset,
 //    long timestamp, long round_id, long status) {
 //    return DMReceiverCallbacks.receiveTextFn(dm_instance_id,
 //       message_id, message_id_len, nickname, nickname_len,
-//       text, text_len, pubkey, pubkey_len, dmToken, codeset,
-//       timestamp, round_id, status);
+//       text, text_len, partnerkey, partnerkey_len, senderkey, senderkey_len,
+//       dmToken, codeset, timestamp, round_id, status);
 // }
 // long cmix_dm_receive_reply(int dm_instance_id,
 //    void* message_id, int message_id_len,
 //    void* reply_to, int reply_to_len,
 //    char* nickname, int nickname_len,
 //    char* text, int text_len,
-//    void* pubkey, int pubkey_len,
+//    void* partnerkey, int partnerkey_len,
+//    void* senderkey, int senderkey_len,
 //    int dmToken, int codeset,
 //    long timestamp, long round_id, long status) {
 //    return DMReceiverCallbacks.receiveReplyFn(dm_instance_id,
 //       message_id, message_id_len, reply_to, reply_to_len,
-//       nickname, nickname_len, text, text_len, pubkey, pubkey_len,
+//       nickname, nickname_len,
+//       text, text_len, partnerkey, partnerkey_len, senderkey, senderkey_len,
 //       dmToken, codeset, timestamp, round_id, status);
 // }
 // long cmix_dm_receive_reaction(int dm_instance_id,
@@ -63,12 +67,14 @@ package main
 //    void* reaction_to, int reaction_to_len,
 //    char* nickname, int nickname_len,
 //    char* text, int text_len,
-//    void* pubkey, int pubkey_len,
+//    void* partnerkey, int partnerkey_len,
+//    void* senderkey, int senderkey_len,
 //    int dmToken, int codeset,
 //    long timestamp, long round_id, long status) {
 //    return DMReceiverCallbacks.receiveReactionFn(dm_instance_id,
 //       message_id, message_id_len, reaction_to, reaction_to_len,
-//       nickname, nickname_len, text, text_len, pubkey, pubkey_len,
+//       nickname, nickname_len,
+//       text, text_len, partnerkey, partnerkey_len, senderkey, senderkey_len,
 //       dmToken, codeset, timestamp, round_id, status);
 // }
 // void cmix_dm_update_sent_status(int dm_instance_id,
