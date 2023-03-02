@@ -22,7 +22,8 @@ public class Program
 {
 
     static void Main(string? ndf = null, string? stateDir = null,
-        string? partnerKey = null, uint partnerToken= 0, string? message = null)
+        string? partnerKey = null, uint partnerToken= 0, string? message = null,
+        int wait = 20)
     {
         if (string.IsNullOrWhiteSpace(ndf))
         {
@@ -147,9 +148,9 @@ public class Program
         DM.SendText(dmClientID, partnerKeyBytes, partnerDMToken, message, 0,
             cMixParamsJSON);
 
-        // Sleep for 20s
+        // Sleep for wait seconds
         // TODO: Normally we'd wait until we receive messages
-        System.Threading.Thread.Sleep(20000);
+        System.Threading.Thread.Sleep(wait*1000);
 
 
         cMix.StopNetworkFollower(cMixID);

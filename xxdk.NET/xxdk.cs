@@ -562,7 +562,7 @@ public unsafe class Network
         char* nickname, int nickname_len,
         void* text, int text_len,
         void* pubkey, int pubkey_len,
-        int dmToken, int codeset,
+        uint dmToken, int codeset,
         long timestamp, long round_id, long msg_type, long status);
     /// <summary>
     /// Received Text message callback
@@ -572,7 +572,7 @@ public unsafe class Network
         char* nickname, int nickname_len,
         char* text, int text_len,
         void* pubkey, int pubkey_len,
-        int dmToken, int codeset,
+        uint dmToken, int codeset,
         long timestamp, long round_id, long status);
     /// <summary>
     /// Received Reply message callback
@@ -583,7 +583,7 @@ public unsafe class Network
         char* nickname, int nickname_len,
         char* text, int text_len,
         void* pubkey, int pubkey_len,
-        int dmToken, int codeset,
+        uint dmToken, int codeset,
         long timestamp, long round_id, long status);
     /// <summary>
     /// Received Reaction message callback
@@ -594,7 +594,7 @@ public unsafe class Network
         char* nickname, int nickname_len,
         char* text, int text_len,
         void* pubkey, int pubkey_len,
-        int dmToken, int codeset,
+        uint dmToken, int codeset,
         long timestamp, long round_id, long status);
     /// <summary>
     /// Message was updated callback. Used to tell UI progress as
@@ -613,7 +613,7 @@ public unsafe class Network
         char* nickname, int nickname_len,
         void* text, int text_len,
         void* pubkey, int pubkey_len,
-        int dmToken, int codeset,
+        uint dmToken, int codeset,
         long timestamp, long round_id, long msg_type, long status)
     {
         Byte[] PubKey = ConvertCVoid(pubkey, pubkey_len);
@@ -630,7 +630,7 @@ public unsafe class Network
         char* nickname, int nickname_len,
         char* text, int text_len,
         void* pubkey, int pubkey_len,
-        int dmToken, int codeset,
+        uint dmToken, int codeset,
         long timestamp, long round_id, long status)
     {
         Byte[] PubKey = ConvertCVoid(pubkey, pubkey_len);
@@ -648,7 +648,7 @@ public unsafe class Network
         char* nickname, int nickname_len,
         char* text, int text_len,
         void* pubkey, int pubkey_len,
-        int dmToken, int codeset,
+        uint dmToken, int codeset,
         long timestamp, long round_id, long status)
     {
         Byte[] PubKey = ConvertCVoid(pubkey, pubkey_len);
@@ -666,7 +666,7 @@ public unsafe class Network
         char* nickname, int nickname_len,
         char* text, int text_len,
         void* pubkey, int pubkey_len,
-        int dmToken, int codeset,
+        uint dmToken, int codeset,
         long timestamp, long round_id, long status)
     {
         Byte[] PubKey = ConvertCVoid(pubkey, pubkey_len);
