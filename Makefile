@@ -1,9 +1,42 @@
-.PHONY: all
+.PHONY: all windows-x64 windows-arm64 linux-arm64 linux-arm64 darwin-x64 darwin-arm64
+
+libxxdk-win-x64.dll:
+	CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build -buildmode=c-shared -o $@ ./sharedcgo
+windows-x64: libxxdk-win-x64.dll
+	mkdir -p runtimes/win-x64/native
+	cp *.h libxxdk-win-x64.dll runtimes/win-x64/native/
+
+libxxdk-win-arm64.dll:
+	CGO_ENABLED=1 GOOS=windows GOARCH=arm64 go build -buildmode=c-shared -o $@ ./sharedcgo
+windows-arm64: libxxdk-win-arm64.dll
+	mkdir -p runtimes/win-arm64/native
+	cp *.h libxxdk-win-arm64.dll runtimes/win-arm64/native/
+
+libxxdk-linux-x64.so:
+	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -buildmode=c-shared -o $@ ./sharedcgo
+linux-x64: libxxdk-linux-x64.so
+	mkdir -p runtimes/linux-x64/native
+	cp *.h libxxdk-linux-x64.so runtimes/linux-x64/native/
+
+libxxdk-linux-arm64.so:
+	CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -buildmode=c-shared -o $@ ./sharedcgo
+linux-arm64: libxxdk-linux-arm64.so
+	mkdir -p runtimes/linux-arm64/native
+	cp *.h libxxdk-linux-arm64.so runtimes/linux-arm64/native/
+
+libxxdk-darwin-x64.so:
+	CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build -buildmode=c-shared -o $@ ./sharedcgo
+darwin-x64: libxxdk-darwin-x64.so
+	mkdir -p runtimes/darwin-x64/native
+	cp *.h libxxdk-darwin-x64.so runtimes/darwin-x64/native/
+
+libxxdk-darwin-arm64.so:
+	CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build -buildmode=c-shared -o $@ ./sharedcgo
+darwin-arm64: libxxdk-darwin-arm64.so
+	mkdir -p runtimes/darwin-arm64/native
+	cp *.h libxxdk-darwin-arm64.so runtimes/darwin-arm64/native/
 
 
-
-all:
-	go build -buildmode=c-shared -o libxxdk.so ./sharedcgo
-	mkdir -p xxdk.NET/bin/Debug/net7.0/
-	cp sharedcgo/*.h *.so xxdk.NET/bin/Debug/net7.0/
-
+all: windows-x64 windows-arm64 linux-arm64 linux-arm64 darwin-x64 darwin-arm64
+#	mkdir -p xxdk.NET/bin/Debug/net7.0/
+#	cp sharedcgo/*.h *.so xxdk.NET/bin/Debug/net7.0/
