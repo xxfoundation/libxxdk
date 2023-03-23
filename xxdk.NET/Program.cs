@@ -13,7 +13,7 @@ using XX;
 namespace Program;
 
 using cMix = XX.Network.CMix;
-using DM = XX.Network.DirectMessaging;
+using DirectMessaging = XX.Network.DirectMessaging;
 
 /// <summary>
 /// Main Program
@@ -84,11 +84,10 @@ public class Program
         Console.WriteLine("Exported Codename Blob: " +
             Encoding.UTF8.GetString(dmID));
 
-        Int32 dmClientID = DM.NewClient(net.GetInstanceID(),
-            dmID, "Hello");
+        DirectMessaging DM = new DirectMessaging(net, dmID, "Hello");
 
-        UInt32 myToken = DM.GetToken(dmClientID);
-        Byte[] pubKey = DM.GetPubKey(dmClientID);
+        UInt32 myToken = DM.GetToken();
+        Byte[] pubKey = DM.GetPubKey();
         Console.WriteLine("DMPUBKEY: " + System.Convert.ToBase64String(pubKey));
         Console.WriteLine("DMTOKEN: " + myToken);
 
@@ -145,7 +144,7 @@ public class Program
             message = "Hello, World!";
         }
 
-        DM.SendText(dmClientID, partnerKeyBytes, partnerDMToken, message, 0,
+        DM.SendText(partnerKeyBytes, partnerDMToken, message, 0,
             cMixParamsJSON);
 
         // Sleep for wait seconds

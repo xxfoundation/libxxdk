@@ -381,8 +381,11 @@ public unsafe class Network
     /// <summary>
     /// Direct Message functionality
     /// </summary>
-    public static class DirectMessaging
+    public class DirectMessaging
     {
+        private Int32 cMixInstanceID;
+        private Int32 dmInstanceID;
+
         /// <summary>
         /// Create a DMClient
         /// </summary>
@@ -391,13 +394,14 @@ public unsafe class Network
         /// <param name="secretPassphrase">Our codename password</param>
         /// <returns>DM Client Instance IE</returns>
         /// <exception cref="Exception">Errors on setup</exception>
-        public static Int32 NewClient(Int32 cMixInstanceID,
+        public DirectMessaging(CMix cMixInstance,
             Byte[] codenameIdentity, String secretPassphrase)
         {
+            this.cMixInstanceID = cMixInstance.GetInstanceID();
             GoSlice id = NewGoSlice(codenameIdentity);
             GoString secret = NewGoString(secretPassphrase);
             cmix_dm_NewDMClient_return ret = CLIB.cmix_dm_NewDMClient(
-                cMixInstanceID, id, secret);
+                this.cMixInstanceID, id, secret);
 
             FreeGoSlice(id);
             FreeGoString(secret);
@@ -408,20 +412,19 @@ public unsafe class Network
                 String errMsg = ConvertCharPtr(err.Msg, err.MsgLen);
                 throw new Exception(errMsg);
             }
-            return ret.DMInstanceID;
+            this.dmInstanceID = ret.DMInstanceID;
         }
 
         /// <summary>
         /// Get our generated DMToken, this is required to send to a
         /// Direct messaging partner. Knowing their pubkey is not enough.
         /// </summary>
-        /// <param name="dmInstanceID">DM Client ID</param>
         /// <returns>The DM Token for this DM Client</returns>
         /// <exception cref="Exception">Errors from Library</exception>
-        public static UInt32 GetToken(Int32 dmInstanceID)
+        public UInt32 GetToken()
         {
             cmix_dm_GetDMToken_return ret = CLIB.cmix_dm_GetDMToken(
-                dmInstanceID);
+                this.dmInstanceID);
             GoError err = ret.Err;
             if (err.IsError != 0)
             {
@@ -433,13 +436,12 @@ public unsafe class Network
         /// <summary>
         /// The Codename Public Key. These are ED25519 curve keys. 
         /// </summary>
-        /// <param name="dmInstanceID">DM Client ID</param>
         /// <returns>Bytes of the public key</returns>
         /// <exception cref="Exception">Error from Library</exception>
-        public static Byte[] GetPubKey(Int32 dmInstanceID)
+        public Byte[] GetPubKey()
         {
             cmix_dm_GetDMPubKey_return ret = CLIB.cmix_dm_GetDMPubKey(
-                dmInstanceID);
+                this.dmInstanceID);
             GoError err = ret.Err;
             if (err.IsError != 0)
             {
@@ -452,7 +454,6 @@ public unsafe class Network
         /// <summary>
         /// SendText sends a text message type as a direct message.
         /// </summary>
-        /// <param name="dmInstanceID">DM Client ID</param>
         /// <param name="partnerPubKey">Public key bytes of the partner</param>
         /// <param name="dmToken">DM token of the partner</param>
         /// <param name="message">Your message</param>
@@ -463,14 +464,14 @@ public unsafe class Network
         /// specific.</param>
         /// <returns>A JSON Encoded SendReport</returns>
         /// <exception cref="Exception">Error on send</exception>
-        public static Byte[] SendText(Int32 dmInstanceID,
+        public Byte[] SendText(
             Byte[] partnerPubKey, UInt32 dmToken,
             String message, Int64 leaseTimeMS, Byte[] cmixParamsJSON)
         {
             GoSlice partnerKey = NewGoSlice(partnerPubKey);
             GoString goMsg = NewGoString(message);
             GoSlice cmixParams = NewGoSlice(cmixParamsJSON);
-            cmix_dm_SendText_return ret = CLIB.cmix_dm_SendText(dmInstanceID,
+            cmix_dm_SendText_return ret = CLIB.cmix_dm_SendText(this.dmInstanceID,
                 partnerKey, dmToken, goMsg, leaseTimeMS, cmixParams);
 
             GoError err = ret.Err;
