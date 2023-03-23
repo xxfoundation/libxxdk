@@ -8,6 +8,7 @@ using System.Security.Principal;
 using System.Text;
 using System.CommandLine;
 using System.Reflection.PortableExecutable;
+using System.Reflection;
 
 namespace XX;
 
@@ -723,25 +724,115 @@ public unsafe class Network
     /// <summary>
     /// Internal CLIB function mappings. Do not use directly.
     /// </summary>
-    static class CLIB
+    internal static class CLIB
     {
+        private const string xxdkLib = "xxdk";
+
+        static CLIB()
+        {
+            // Setup our custom import resolver to search the runtimes directory
+            NativeLibrary.SetDllImportResolver(typeof(CLIB).Assembly,
+                DllImportResolver);
+        }
+
+        static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+        static readonly bool IsMac = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+        static readonly bool IsLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+
+        static readonly bool isX64 = (RuntimeInformation.ProcessArchitecture == Architecture.X64) ? true : false;
+        static readonly bool isArm64 = (RuntimeInformation.ProcessArchitecture == Architecture.Arm64) ? true : false;
+
+        private static IntPtr DllImportResolver(string libraryName,
+            Assembly assembly, DllImportSearchPath? searchPath)
+        {
+            if (libraryName != xxdkLib)
+            {
+                //Console.Error.WriteLine("Library Name: " + libraryName);
+                return IntPtr.Zero;
+            }
+
+            string myOS;
+            string myLibName = libraryName;
+            if (IsWindows) {
+                myOS = "win";
+                myLibName = myLibName + ".dll";
+            } else if (IsMac) {
+                myOS = "darwin";
+                myLibName = "lib" + myLibName + ".so";
+            }
+            else if (IsLinux) {
+                myOS = "linux";
+                myLibName = "lib" + myLibName + ".so";
+            }
+            else
+            {
+                throw new Exception("unsupported operating system: "
+                    + RuntimeInformation.OSDescription);
+            }
+
+            string myARCH;
+            if (isX64)
+            {
+                myARCH = "x64";
+            }
+            else if (isArm64)
+            {
+                myARCH = "arm64";
+            }
+            else
+            {
+                throw new Exception("unsupported architecture: "
+                    + RuntimeInformation.ProcessArchitecture);
+            }
+
+            string myTarget = myOS + "-" + myARCH;
+            string mySearchPath = Path.Join("runtimes", myTarget, "native");
+
+            object? nativeSearchContexts = AppContext.GetData(
+                "PLATFORM_RESOURCE_ROOTS");
+            var delimiter = RuntimeInformation.IsOSPlatform(
+                OSPlatform.Windows) ? ";" : ":";
+            if (nativeSearchContexts != null)
+            {
+                string nativePaths = (string)nativeSearchContexts;
+                foreach (var directory in nativePaths.Split(delimiter))
+                {
+                    var path = Path.Combine(directory, mySearchPath,
+                        myLibName);
+                    //Console.Error.WriteLine("PATH: " + path);
+                    if (Path.Exists(path))
+                    {
+                        return NativeLibrary.Load(path);
+                    }
+                }
+            }
+
+            // Next, try to load any OS-provided version of the library
+            IntPtr lib;
+            if (NativeLibrary.TryLoad(myLibName, out lib))
+            {
+                return lib;
+            }
+            return NativeLibrary.Load(myLibName, assembly, searchPath);
+        }
+
         // This function sets the cMix DM Receiver callbacks in the library
         // You must call it before starting networking and receiving
         // messages.
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern void cmix_dm_set_callbacks(
             DMReceiverCallbackFunctions cbs);
 
         // GetVersion returns the xxdk.SEMVER.
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern GoString GetVersion();
 
         // GetGitVersion returns the xxdk.GITVERSION.
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern GoString GetGitVersion();
 
         // GetDependencies returns the xxdk.DEPENDENCIES.
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern GoString GetDependencies();
 
         // NewCmix creates user storage, generates keys, connects, and registers with
@@ -750,7 +841,7 @@ public unsafe class Network
         // date.
         //
         // Users of this function should delete the storage directory on error.
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern GoError NewCmix(GoString ndfJSON,
             GoString storageDir, GoSlice password,
             GoString registrationCode);
@@ -771,46 +862,46 @@ public unsafe class Network
         // Creating multiple cMix instance IDs with the same storage Dir will
         // cause data corruption. In most cases only 1 instance should ever be
         // needed.
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern LoadCmix_return LoadCmix(GoString storageDir,
             GoSlice password, GoSlice cmixParamsJSON);
 
 
         // cmix_GetReceptionID returns the current default reception ID
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern cmix_GetReceptionID_return cmix_GetReceptionID(
             GoInt32 cMixInstanceID);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern cmix_EKVGet_return cmix_EKVGet(
             GoInt32 cMixInstanceID, GoString key);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern GoError cmix_EKVSet(GoInt32 cMixInstanceID,
             GoString key, GoSlice value);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern GoError cmix_StartNetworkFollower(
             GoInt32 cMixInstanceID, GoInt timeoutMS);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern GoError cmix_StopNetworkFollower(
             GoInt32 cMixInstanceID);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern GoError cmix_WaitForNetwork(GoInt32 cMixInstanceID,
             GoInt timeoutMS);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern GoUint8 cmix_ReadyToSend(GoInt32 cMixInstanceID);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern GoByteSlice cmix_GenerateCodenameIdentity(
             GoString secretPassphrase);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern cmix_dm_NewDMClient_return cmix_dm_NewDMClient(
             GoInt32 cMixInstanceID, GoSlice codenameIdentity,
             GoString secretPassphrase);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern cmix_dm_GetDMToken_return cmix_dm_GetDMToken(
             GoInt32 dmInstanceID);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern cmix_dm_GetDMPubKey_return cmix_dm_GetDMPubKey(
             GoInt32 dmInstanceID);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern cmix_dm_SendText_return cmix_dm_SendText(
             GoInt32 dmInstanceID, GoSlice partnerPubKey, GoUint32 dmToken,
             GoString message, GoInt64 leaseTimeMS, GoSlice cmixParamsJSON);
