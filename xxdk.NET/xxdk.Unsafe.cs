@@ -164,8 +164,24 @@ public unsafe class Network
     /// <summary>
     /// cMix Functions for connecting with the XX network
     /// </summary>
-    public static class CMix
+    public class CMix
     {
+        private Int32 cMixInstanceID;
+
+        // Use LoadCmix to get a proper CMix object.
+        // NewCmix must first be called to instantiate the object.
+        private CMix()
+        {
+            this.cMixInstanceID = -1;
+        }
+
+        /// <summary>Return the instance id handler used by the cMix library.
+        /// -1 indicates an uninalizated insance.</summary>
+        public Int32 GetInstanceID()
+        {
+            return this.cMixInstanceID;
+        }
+
         /// <summary>
         /// Create a new cMix instantiation. This does not
         /// connect to the network, but merely sets up storage and
@@ -212,7 +228,7 @@ public unsafe class Network
         /// <returns>CMix Instance Identifier (a number, acts
         /// like a file descriptor)</returns>
         /// <exception cref="Exception">Errors occured during setup</exception>
-        public static int LoadCmix(String storageDir, Byte[] password,
+        public static CMix LoadCmix(String storageDir, Byte[] password,
             Byte[] cmixParamsJSON)
         {
             GoString storageDirGS = NewGoString(storageDir);
@@ -233,19 +249,20 @@ public unsafe class Network
                 throw new Exception(errMsg);
             }
 
-            return ret.cMixInstanceID;
+            CMix cMix = new CMix();
+            cMix.cMixInstanceID = ret.cMixInstanceID;
+            return cMix;
         }
 
         /// <summary>
         /// cmix_GetReceptionID returns the current default reception ID
         /// </summary>
-        /// <param name="cMixInstanceID">Instance ID from LoadCmix</param>
         /// <returns>The cMix Reception ID, used to receive RAW cMix Messages</returns>
         /// <exception cref="Exception">Error occured in library</exception>
-        public static Byte[] GetReceptionID(Int32 cMixInstanceID)
+        public Byte[] GetReceptionID()
         {
             cmix_GetReceptionID_return rid = CLIB.cmix_GetReceptionID(
-                cMixInstanceID);
+                this.cMixInstanceID);
             GoError err = rid.Err;
             if (err.IsError != 0)
             {
@@ -258,14 +275,13 @@ public unsafe class Network
         /// <summary>
         /// EKVGet retrieves a value from secure Key-Value storage.
         /// </summary>
-        /// <param name="cMixInstanceID">Instance ID for cMix</param>
         /// <param name="key">The key associated with the value</param>
         /// <returns>Bytes of the value</returns>
         /// <exception cref="Exception">Error or if key cannot be found</exception>
-        public static Byte[] EKVGet(Int32 cMixInstanceID, String key)
+        public Byte[] EKVGet(String key)
         {
             GoString goKey = NewGoString(key);
-            cmix_EKVGet_return ret = CLIB.cmix_EKVGet(cMixInstanceID, goKey);
+            cmix_EKVGet_return ret = CLIB.cmix_EKVGet(this.cMixInstanceID, goKey);
 
             GoError err = ret.Err;
             if (err.IsError != 0)
@@ -279,16 +295,15 @@ public unsafe class Network
         /// <summary>
         /// EKVSet a value in the Key value storage
         /// </summary>
-        /// <param name="cMixInstanceID">Instance ID for cMix</param>
         /// <param name="key">The key associated with the value</param>
         /// <param name="value">The bytes to store as the value</param>
         /// <exception cref="Exception">Write errors</exception>
-        public static void EKVSet(Int32 cMixInstanceID, String key,
+        public void EKVSet(String key,
             Byte[] value)
         {
             GoString goKey = NewGoString(key);
             GoSlice goVal = NewGoSlice(value);
-            GoError err = CLIB.cmix_EKVSet(cMixInstanceID, goKey, goVal);
+            GoError err = CLIB.cmix_EKVSet(this.cMixInstanceID, goKey, goVal);
             if (err.IsError != 0)
             {
                 String errMsg = ConvertCharPtr(err.Msg, err.MsgLen);
@@ -302,15 +317,13 @@ public unsafe class Network
         /// <summary>
         /// Start following the cMix network. 
         /// </summary>
-        /// <param name="cMixInstanceID">Instance ID for cMix</param>
         /// <param name="timeoutMS">Error out if we haven't connected
         /// by this many milliseconds</param>
         /// <exception cref="Exception">Timeout or other error on
         /// connection</exception>
-        public static void StartNetworkFollower(Int32 cMixInstanceID,
-            Int32 timeoutMS)
+        public void StartNetworkFollower(Int32 timeoutMS)
         {
-            GoError err = CLIB.cmix_StartNetworkFollower(cMixInstanceID,
+            GoError err = CLIB.cmix_StartNetworkFollower(this.cMixInstanceID,
                 timeoutMS);
             if (err.IsError != 0)
             {
@@ -322,10 +335,9 @@ public unsafe class Network
         /// Stop the network follower. You should call this any time
         /// your app goes to the background. 
         /// </summary>
-        /// <param name="cMixInstanceID">Instance ID for cMix</param>
         /// <exception cref="Exception">Timeout or other error on
         /// shutdown</exception>
-        public static void StopNetworkFollower(Int32 cMixInstanceID)
+        public void StopNetworkFollower()
         {
             GoError err = CLIB.cmix_StopNetworkFollower(cMixInstanceID);
             if (err.IsError != 0)
@@ -338,14 +350,12 @@ public unsafe class Network
         /// Wait timeoutMS or until you are caught up with the network.
         /// Use this before you send a message.
         /// </summary>
-        /// <param name="cMixInstanceID">Instance Id for cMix</param>
         /// <param name="timeoutMS">Timeout in milliseconds</param>
         /// <exception cref="Exception">Timed out or other send
         /// error</exception>
-        public static void WaitForNetwork(Int32 cMixInstanceID,
-            Int32 timeoutMS)
+        public void WaitForNetwork(Int32 timeoutMS)
         {
-            GoError err = CLIB.cmix_WaitForNetwork(cMixInstanceID, timeoutMS);
+            GoError err = CLIB.cmix_WaitForNetwork(this.cMixInstanceID, timeoutMS);
             if (err.IsError != 0)
             {
                 String errMsg = ConvertCharPtr(err.Msg, err.MsgLen);
@@ -356,11 +366,10 @@ public unsafe class Network
         /// Are we ready to send? This is a quick check you can make. Useful
         /// for showing the UI if you are connected.
         /// </summary>
-        /// <param name="cMixInstanceID">cMix Instance ID</param>
         /// <returns>If we are connected</returns>
-        public static Boolean ReadyToSend(Int32 cMixInstanceID)
+        public Boolean ReadyToSend()
         {
-            GoUint8 ready = CLIB.cmix_ReadyToSend(cMixInstanceID);
+            GoUint8 ready = CLIB.cmix_ReadyToSend(this.cMixInstanceID);
             if (ready != 0)
             {
                 return true;

@@ -61,16 +61,16 @@ public class Program
         }
         // TODO: Instead of tracking these IDs c-lib style, we should
         //       return class intances that do it for us.
-        int cMixID = cMix.LoadCmix(stateDir, secret, cMixParamsJSON);
+        cMix net = cMix.LoadCmix(stateDir, secret, cMixParamsJSON);
 
-        Byte[] receptionID = cMix.GetReceptionID(cMixID);
+        Byte[] receptionID = net.GetReceptionID();
         Console.WriteLine("cMix Reception ID: " +
             System.Convert.ToBase64String(receptionID));
 
         Byte[] dmID;
         try
         {
-            dmID = cMix.EKVGet(cMixID, "MyDMID");
+            dmID = net.EKVGet("MyDMID");
         }
         catch (Exception)
         {
@@ -78,13 +78,13 @@ public class Program
             dmID = XX.Network.GenerateCodenameIdentity("Hello");
             Console.WriteLine("Exported Codename Blob: " +
                 System.Convert.ToBase64String(dmID));
-            cMix.EKVSet(cMixID, "MyDMID", dmID);
+            net.EKVSet("MyDMID", dmID);
         }
 
         Console.WriteLine("Exported Codename Blob: " +
             Encoding.UTF8.GetString(dmID));
 
-        Int32 dmClientID = DM.NewClient(cMixID,
+        Int32 dmClientID = DM.NewClient(net.GetInstanceID(),
             dmID, "Hello");
 
         UInt32 myToken = DM.GetToken(dmClientID);
@@ -109,14 +109,14 @@ public class Program
             System.Convert.ToBase64String(partnerKeyBytes));
         Console.WriteLine("PARTNERDMTOKEN: " + partnerDMToken);
 
-        cMix.StartNetworkFollower(cMixID, 5000);
+        net.StartNetworkFollower(5000);
 
         Boolean connected = false;
         while (!connected)
         {
             try
             {
-                cMix.WaitForNetwork(cMixID, 20000);
+                net.WaitForNetwork(20000);
                 connected = true;
             }
             catch (Exception e)
@@ -131,7 +131,7 @@ public class Program
         {
             try
             {
-                registered = cMix.ReadyToSend(cMixID);
+                registered = net.ReadyToSend();
                 System.Threading.Thread.Sleep(1000);
             }
             catch (Exception e)
@@ -153,7 +153,7 @@ public class Program
         System.Threading.Thread.Sleep(wait*1000);
 
 
-        cMix.StopNetworkFollower(cMixID);
+        net.StopNetworkFollower();
 
     }
 
