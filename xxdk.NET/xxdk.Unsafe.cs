@@ -379,6 +379,116 @@ public unsafe class Network
     }
 
     /// <summary>
+    /// IDMCallbackFunctions is the interface for DM Callbacks. Users
+    /// must pass an impelementation of this interface to the DM object.
+    /// </summary>
+    public interface IDMCallbackFunctions
+    {
+        /// <summary>
+        /// Receive RAW direct message callback
+        /// </summary>
+        Int64 DMReceiveCallbackFn(Byte[] message_id, String nickname,
+            Byte[] text, Byte[] partnerkey, Byte[] senderkey, UInt32 dmToken,
+            Int32 codeset, Int64 timestamp, Int64 round_id, Int64 msg_type,
+            Int64 status);
+
+        /// <summary>
+        /// Received Text message callback
+        /// </summary>
+        Int64 DMReceiveTextCallbackFn(Byte[] message_id, String nickname,
+            String text, Byte[] partnerkey, Byte[] senderkey, UInt32 dmToken,
+            Int32 codeset, Int64 timestamp, Int64 round_id, Int64 status);
+
+        /// <summary>
+        /// Received Reply message callback
+        /// </summary>
+        Int64 DMReceiveReplyCallbackFn(Byte[] message_id, Byte[] reply_to,
+            String nickname, String text, Byte[] partnerkey, Byte[] senderkey,
+            UInt32 dmToken, Int32 codeset, Int64 timestamp, Int64 round_id,
+            Int64 status);
+
+        /// <summary>
+        /// Received Reaction message callback
+        /// </summary>
+        Int64 DMReceiveReactionCallbackFn(Byte[] message_id, Byte[] reaction_to,
+            String nickname, String text, Byte[] partnerkey, Byte[] senderkey,
+            UInt32 dmToken, Int32 codeset, Int64 timestamp, Int64 round_id,
+            Int64 status);
+        /// <summary>
+        /// Message was updated callback. Used to tell UI progress as
+        /// message is sent through the network. 
+        /// </summary>
+        Int64 DMUpdateSentStatusCallbackFn(Int64 uuid, Byte[] message_id,
+            Int64 timestamp, Int64 round_id, Int64 status);
+    }
+
+    /// <summary>
+    /// DMCallbackSingleton is used by the c library callback functions
+    /// (implemented below) to call the registered callbacks for a given
+    /// DM Instance.
+    /// </summary>
+    public sealed class DMCalllbackSingleton
+    {
+        private Dictionary<Int32, IDMCallbackFunctions> CBs;
+        private static DMCalllbackSingleton? Instance = null;
+
+        /// <summary>
+        /// GetInstance Singleton accessor
+        /// </summary>
+        /// <returns>the DMCallbackSingleton instance</returns>
+        public static DMCalllbackSingleton GetInstance()
+        {
+            //NOTE: This is not thread safe, but since it's initialized on
+            // start it should be OK. 
+            if (Instance == null)
+            {
+                Instance = new DMCalllbackSingleton();
+            }
+
+            return Instance;
+        }
+
+        /// <summary>
+        /// Private DMSingleton constructor, can only be called by GetInstance
+        /// </summary>
+        private DMCalllbackSingleton()
+        {
+            this.CBs = new Dictionary<Int32, IDMCallbackFunctions>();
+        }
+
+        /// <summary>
+        /// SetCallbacks sets callbacks for a specific dm InstanceID.
+        /// </summary>
+        /// <param name="DMInstanceID">The DirectMessaging instance
+        /// this is for</param>
+        /// <param name="dmCBs">the callbacks implementation to use</param>
+        /// <exception cref="Exception">exception when the interface
+        /// does not exist.</exception>
+        public void SetCallbacks(Int32 DMInstanceID, IDMCallbackFunctions dmCBs)
+        {
+            if (dmCBs == null)
+            {
+                throw new Exception("must implement IDMCallbackFunctions");
+            }
+            // NOTE: Used add here to cause a throw if duplicate key is used.
+            this.CBs.Add(DMInstanceID, dmCBs);
+        }
+
+        /// <summary>
+        /// Get the callbacks for a specific DM instance
+        /// </summary>
+        /// <param name="DMInstanceID">the dm instance we want the
+        /// callbacks for.</param>
+        /// <returns>the callbacks implementation for the specified
+        /// dm instance.</returns>
+        public IDMCallbackFunctions GetCallbacks(Int32 DMInstanceID)
+        {
+            return this.CBs[DMInstanceID];
+        }
+    }
+
+
+    /// <summary>
     /// Direct Message functionality
     /// </summary>
     public class DirectMessaging
@@ -389,13 +499,15 @@ public unsafe class Network
         /// <summary>
         /// Create a DMClient
         /// </summary>
-        /// <param name="cMixInstanceID">The cMix Instance Id to use</param>
+        /// <param name="cMixInstance">cMix network interface to use</param>
         /// <param name="codenameIdentity">our Codename for DMs</param>
         /// <param name="secretPassphrase">Our codename password</param>
+        /// <param name="Callbacks">Implementation of callbacks for DM</param>
         /// <returns>DM Client Instance IE</returns>
         /// <exception cref="Exception">Errors on setup</exception>
         public DirectMessaging(CMix cMixInstance,
-            Byte[] codenameIdentity, String secretPassphrase)
+            Byte[] codenameIdentity, String secretPassphrase,
+            IDMCallbackFunctions Callbacks)
         {
             this.cMixInstanceID = cMixInstance.GetInstanceID();
             GoSlice id = NewGoSlice(codenameIdentity);
@@ -413,6 +525,8 @@ public unsafe class Network
                 throw new Exception(errMsg);
             }
             this.dmInstanceID = ret.DMInstanceID;
+            DMCalllbackSingleton cb = DMCalllbackSingleton.GetInstance();
+            cb.SetCallbacks(this.dmInstanceID, Callbacks);
         }
 
         /// <summary>
@@ -621,7 +735,8 @@ public unsafe class Network
         long round_id, long status);
 
     /// <summary>
-    /// Dummy implementation of callback
+    /// Pass through implementation for C Library Callback for
+    /// DMReceive
     /// </summary>
     public static long DMReceive(int dm_instance_id,
         void* message_id, int message_id_len,
@@ -632,18 +747,29 @@ public unsafe class Network
         uint dmToken, int codeset,
         long timestamp, long round_id, long msg_type, long status)
     {
+        DMCalllbackSingleton dm = DMCalllbackSingleton.GetInstance();
+        IDMCallbackFunctions cbs = dm.GetCallbacks(dm_instance_id);
+
+        Byte[] MsgID = ConvertCVoid(message_id, message_id_len);
+        String Nick = ConvertCChar(nickname, nickname_len);
+        Byte[] Text = ConvertCVoid(text, text_len);
         Byte[] partnerKey = ConvertCVoid(partnerkey, partnerkey_len);
         Byte[] senderKey = ConvertCVoid(senderkey, senderkey_len);
-        Byte[] Message = ConvertCVoid(text, text_len);
-        Console.WriteLine("DMReceive: { 0}, { 1}: { 2}",
-            System.Convert.ToBase64String(partnerKey), System.Convert.ToBase64String(senderKey), dmToken, Message);
-        return 0;
+
+        Console.WriteLine("DMReceive: {0}, {1}: {2}",
+            System.Convert.ToBase64String(partnerKey),
+            System.Convert.ToBase64String(senderKey), dmToken, Text);
+
+        return cbs.DMReceiveCallbackFn(MsgID,
+            Nick, Text, partnerKey, senderKey, dmToken, codeset, timestamp,
+            round_id, msg_type, status);
     }
     /// <summary>
-    /// Dummy implementation of callback
+    /// Pass through implementation for C Library Callback for
+    /// DMReceiveText
     /// </summary>
     public static long DMReceiveText(int dm_instance_id,
-        void* mesage_id, int message_id_len,
+        void* message_id, int message_id_len,
         char* nickname, int nickname_len,
         char* text, int text_len,
         void* partnerkey, int partnerkey_len,
@@ -651,19 +777,29 @@ public unsafe class Network
         uint dmToken, int codeset,
         long timestamp, long round_id, long status)
     {
+        DMCalllbackSingleton dm = DMCalllbackSingleton.GetInstance();
+        IDMCallbackFunctions cbs = dm.GetCallbacks(dm_instance_id);
+
+        Byte[] MsgID = ConvertCVoid(message_id, message_id_len);
+        String Nick = ConvertCChar(nickname, nickname_len);
+        String Text = ConvertCChar(text, text_len);
         Byte[] partnerKey = ConvertCVoid(partnerkey, partnerkey_len);
         Byte[] senderKey = ConvertCVoid(senderkey, senderkey_len);
-        String Message = ConvertCChar(text, text_len);
+
         Console.WriteLine("DMReceiveText: {0}->{1}, {2}: {3}",
             System.Convert.ToBase64String(partnerKey),
-            System.Convert.ToBase64String(senderKey), dmToken, Message);
-        return 0;
+            System.Convert.ToBase64String(senderKey), dmToken, Text);
+
+        return cbs.DMReceiveTextCallbackFn(MsgID,
+            Nick, Text, partnerKey, senderKey, dmToken, codeset, timestamp,
+            round_id, status);
     }
     /// <summary>
-    /// Dummy implementation of callback
+    /// Pass through implementation for C Library Callback for
+    /// DMReceiveReply
     /// </summary>
     public static long DMReceiveReply(int dm_instance_id,
-        void* mesage_id, int message_id_len,
+        void* message_id, int message_id_len,
         void* reply_to, int reply_to_len,
         char* nickname, int nickname_len,
         char* text, int text_len,
@@ -672,19 +808,30 @@ public unsafe class Network
         uint dmToken, int codeset,
         long timestamp, long round_id, long status)
     {
+        DMCalllbackSingleton dm = DMCalllbackSingleton.GetInstance();
+        IDMCallbackFunctions cbs = dm.GetCallbacks(dm_instance_id);
+
+        Byte[] MsgID = ConvertCVoid(message_id, message_id_len);
+        Byte[] ReplyTo = ConvertCVoid(reply_to, reply_to_len);
+        String Nick = ConvertCChar(nickname, nickname_len);
+        String Text = ConvertCChar(text, text_len);
         Byte[] partnerKey = ConvertCVoid(partnerkey, partnerkey_len);
         Byte[] senderKey = ConvertCVoid(senderkey, senderkey_len);
-        String Message = ConvertCChar(text, text_len);
+
         Console.WriteLine("DMReceiveReply {0}->{1}, {2}: {3}",
             System.Convert.ToBase64String(partnerKey),
-            System.Convert.ToBase64String(senderKey), dmToken, Message);
-        return 0;
+            System.Convert.ToBase64String(senderKey), dmToken, Text);
+
+        return cbs.DMReceiveReplyCallbackFn(MsgID, ReplyTo,
+            Nick, Text, partnerKey, senderKey, dmToken, codeset, timestamp,
+            round_id, status);
     }
     /// <summary>
-    /// Dummy implementation of callback
+    /// Pass through implementation for C Library Callback for
+    /// DMReceiveReaction
     /// </summary>
     public static long DMReceiveReaction(int dm_instance_id,
-        void* mesage_id, int message_id_len,
+        void* message_id, int message_id_len,
         void* reaction_to, int reaction_to_len,
         char* nickname, int nickname_len,
         char* text, int text_len,
@@ -693,26 +840,42 @@ public unsafe class Network
         uint dmToken, int codeset,
         long timestamp, long round_id, long status)
     {
+        DMCalllbackSingleton dm = DMCalllbackSingleton.GetInstance();
+        IDMCallbackFunctions cbs = dm.GetCallbacks(dm_instance_id);
+
+        Byte[] MsgID = ConvertCVoid(message_id, message_id_len);
+        Byte[] ReactionTo = ConvertCVoid(reaction_to, reaction_to_len);
+        String Nick = ConvertCChar(nickname, nickname_len);
+        String Text = ConvertCChar(text, text_len);
         Byte[] partnerKey = ConvertCVoid(partnerkey, partnerkey_len);
         Byte[] senderKey = ConvertCVoid(senderkey, senderkey_len);
-        String Message = ConvertCChar(text, text_len);
+
         Console.WriteLine("DMReceiveReaction {0}->{1}, {2}: {3}",
             System.Convert.ToBase64String(partnerKey),
-            System.Convert.ToBase64String(senderKey), dmToken, Message);
-        return 0;
+            System.Convert.ToBase64String(senderKey), dmToken, Text);
+
+        return cbs.DMReceiveReactionCallbackFn(MsgID, ReactionTo,
+            Nick, Text, partnerKey, senderKey, dmToken, codeset, timestamp,
+            round_id, status);
     }
     /// <summary>
-    /// Dummy implementation of callback
+    /// Pass through implementation for C Library Callback for
+    /// DMUpdateSentStatus
     /// </summary>
     public static long DMUpdateSentStatus(int dm_instance_id,
         long uuid,
         void* message_id, int message_id_len, long timestamp,
         long round_id, long status)
     {
+        DMCalllbackSingleton dm = DMCalllbackSingleton.GetInstance();
+        IDMCallbackFunctions cbs = dm.GetCallbacks(dm_instance_id);
+
         Byte[] MsgID = ConvertCVoid(message_id, message_id_len);
         Console.WriteLine("DMUpdateSentStatus {0}: {1}",
             System.Convert.ToBase64String(MsgID), status);
-        return 0;
+
+        return cbs.DMUpdateSentStatusCallbackFn(uuid, MsgID,
+            timestamp, round_id, status);
     }
 
     /// <summary>

@@ -23,7 +23,7 @@ public class Program
 
     static void Main(string? ndf = null, string? stateDir = null,
         string? partnerKey = null, uint partnerToken= 0, string? message = null,
-        int wait = 20)
+        int wait = 20, Int64 receiveCount = 1)
     {
         if (string.IsNullOrWhiteSpace(ndf))
         {
@@ -84,7 +84,9 @@ public class Program
         Console.WriteLine("Exported Codename Blob: " +
             Encoding.UTF8.GetString(dmID));
 
-        DirectMessaging DM = new DirectMessaging(net, dmID, "Hello");
+        DMCallbacks dmCbs = new();
+
+        DirectMessaging DM = new(net, dmID, "Hello", dmCbs);
 
         UInt32 myToken = DM.GetToken();
         Byte[] pubKey = DM.GetPubKey();
@@ -147,13 +149,103 @@ public class Program
         DM.SendText(partnerKeyBytes, partnerDMToken, message, 0,
             cMixParamsJSON);
 
-        // Sleep for wait seconds
-        // TODO: Normally we'd wait until we receive messages
-        System.Threading.Thread.Sleep(wait*1000);
+        // wait at most wait times
+        int waitCnt = 0;
+        while (dmCbs.GetNumReceived() < receiveCount && waitCnt < wait)
+        {
+            Console.WriteLine("Num Received: {0}...", dmCbs.GetNumReceived());
+            System.Threading.Thread.Sleep(1000); // 1s per wait
+            waitCnt++;
+        }
 
+        if (waitCnt >= wait)
+        {
+            Console.WriteLine("Timed out waiting for messages!");
+        }
+
+        Console.WriteLine("Num Received: {0}...Exiting!",
+            dmCbs.GetNumReceived());
 
         net.StopNetworkFollower();
 
-    }
 
+    }
+    private class DMCallbacks : XX.Network.IDMCallbackFunctions
+    {
+        private Int64 numReceived;
+        public DMCallbacks()
+        {
+            this.numReceived = 0;
+        }
+
+        public Int64 GetNumReceived()
+        {
+            return this.numReceived;
+        }
+
+        /// <summary>
+        /// Receive RAW direct message callback
+        /// </summary>
+        public Int64 DMReceiveCallbackFn(Byte[] message_id, String nickname,
+            Byte[] text, Byte[] partnerkey, Byte[] senderkey, UInt32 dmToken,
+            Int32 codeset, Int64 timestamp, Int64 round_id, Int64 msg_type,
+            Int64 status)
+        {
+            Console.WriteLine("DMReceiveCallbackFn");
+            this.numReceived++;
+            return this.numReceived;
+        }
+
+        /// <summary>
+        /// Received Text message callback
+        /// </summary>
+        public Int64 DMReceiveTextCallbackFn(Byte[] message_id, String nickname,
+            String text, Byte[] partnerkey, Byte[] senderkey, UInt32 dmToken,
+            Int32 codeset, Int64 timestamp, Int64 round_id, Int64 status)
+        {
+            Console.WriteLine("DMReceiveTextCallbackFn");
+            this.numReceived++;
+            return this.numReceived;
+
+        }
+
+        /// <summary>
+        /// Received Reply message callback
+        /// </summary>
+        public Int64 DMReceiveReplyCallbackFn(Byte[] message_id, Byte[] reply_to,
+            String nickname, String text, Byte[] partnerkey, Byte[] senderkey,
+            UInt32 dmToken, Int32 codeset, Int64 timestamp, Int64 round_id,
+            Int64 status)
+        {
+            Console.WriteLine("DMReceiveReplyCallbackFn");
+            this.numReceived++;
+            return this.numReceived;
+
+        }
+
+        /// <summary>
+        /// Received Reaction message callback
+        /// </summary>
+        public Int64 DMReceiveReactionCallbackFn(Byte[] message_id, Byte[] reaction_to,
+            String nickname, String text, Byte[] partnerkey, Byte[] senderkey,
+            UInt32 dmToken, Int32 codeset, Int64 timestamp, Int64 round_id,
+            Int64 status)
+        {
+            Console.WriteLine("DMReceiveReactionCallbackFn");
+            this.numReceived++;
+            return this.numReceived;
+        }
+
+        /// <summary>
+        /// Message was updated callback. Used to tell UI progress as
+        /// message is sent through the network. 
+        /// </summary>
+        public Int64 DMUpdateSentStatusCallbackFn(Int64 uuid, Byte[] message_id,
+            Int64 timestamp, Int64 round_id, Int64 status)
+        {
+            Console.WriteLine("DMUpdateSentStatusCallbackFn");
+            this.numReceived++;
+            return this.numReceived;
+        }
+    }
 }
