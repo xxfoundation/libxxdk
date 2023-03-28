@@ -84,11 +84,27 @@ package main
 //    DMReceiverCallbacks.updateSentStatusFn(dm_instance_id, uuid,
 //        message_id, message_id_len, timestamp, round_id, status);
 // }
+// void cmix_dm_block_sender(void* pubkey, int pubkey_len) {
+//    DMReceiverCallbacks.blockSenderFn(pubkey, pubkey_len);
+// }
+// void cmix_dm_unblock_sender(void* pubkey, int pubkey_len) {
+//    DMReceiverCallbacks.unblockSenderFn(pubkey, pubkey_len);
+// }
+// GoByteSlice cmix_dm_get_conversation(void* senderkey, int senderkey_len) {
+//    return DMReceiverCallbacks.getConversationFn(senderkey, senderkey_len);
+// }
+// GoByteSlice cmix_dm_get_conversations() {
+//    return DMReceiverCallbacks.getConversationsFn();
+// }
 // extern void cmix_dm_set_callbacks(DMReceiverCallbackFunctions cbs) {
 //     DMReceiverCallbacks.receiveFn = cbs.receiveFn;
 //     DMReceiverCallbacks.receiveTextFn = cbs.receiveTextFn;
 //     DMReceiverCallbacks.receiveReplyFn = cbs.receiveReplyFn;
 //     DMReceiverCallbacks.receiveReactionFn = cbs.receiveReactionFn;
 //     DMReceiverCallbacks.updateSentStatusFn = cbs.updateSentStatusFn;
+//     DMReceiverCallbacks.blockSenderFn = cbs.blockSenderFn;
+//     DMReceiverCallbacks.unblockSenderFn = cbs.unblockSenderFn;
+//     DMReceiverCallbacks.getConversationFn = cbs.getConversationFn;
+//     DMReceiverCallbacks.getConversationsFn = cbs.getConversationsFn;
 // }
 import "C"
