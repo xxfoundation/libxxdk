@@ -50,11 +50,13 @@ typedef void (* cmix_dm_update_sent_status_cb)(int dm_instance_id,
   long uuid,
   void* message_id, int message_id_len, long timestamp,
   long round_id, long status);
-typedef void (* cmix_dm_block_sender_cb)(void* pubkey, int pubkey_len);
-typedef void (* cmix_dm_unblock_sender_cb)(void* pubkey, int pubkey_len);
-typedef GoByteSlice (* cmix_dm_get_conversation_cb)(void* senderkey,
-  int senderkey_len);
-typedef GoByteSlice (* cmix_dm_get_conversations_cb)();
+typedef void (* cmix_dm_block_sender_cb)(int dm_instance_id,
+  void* pubkey, int pubkey_len);
+typedef void (* cmix_dm_unblock_sender_cb)(int dm_instance_id,
+  void* pubkey, int pubkey_len);
+typedef GoByteSlice (* cmix_dm_get_conversation_cb)(int dm_instance_id,
+  void* senderkey, int senderkey_len);
+typedef GoByteSlice (* cmix_dm_get_conversations_cb)(int dm_instance_id);
 
 // This struct values must be set by your program, the symbol is called
 // "DMReceiverCallbacks"

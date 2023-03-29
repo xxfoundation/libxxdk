@@ -247,5 +247,27 @@ public class Program
             this.numReceived++;
             return this.numReceived;
         }
+
+        public void DMBlockUser(byte[] pubkey)
+        {
+            return;
+        }
+
+        public void DMUnblockUser(byte[] pubkey)
+        {
+            return;
+        }
+
+        public byte[] DMGetConversation(byte[] senderkey)
+        {
+            Byte[] conv = Array.Empty<byte>();
+            return conv;
+        }
+
+        public byte[] DMGetConversations()
+        {
+            Byte[] conv = Array.Empty<byte>();
+            return conv;
+        }
     }
 }

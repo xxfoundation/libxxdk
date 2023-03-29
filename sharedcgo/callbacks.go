@@ -84,17 +84,20 @@ package main
 //    DMReceiverCallbacks.updateSentStatusFn(dm_instance_id, uuid,
 //        message_id, message_id_len, timestamp, round_id, status);
 // }
-// void cmix_dm_block_sender(void* pubkey, int pubkey_len) {
-//    DMReceiverCallbacks.blockSenderFn(pubkey, pubkey_len);
+// void cmix_dm_block_sender(int dm_instance_id, void* pubkey, int pubkey_len) {
+//    DMReceiverCallbacks.blockSenderFn(dm_instance_id, pubkey, pubkey_len);
 // }
-// void cmix_dm_unblock_sender(void* pubkey, int pubkey_len) {
-//    DMReceiverCallbacks.unblockSenderFn(pubkey, pubkey_len);
+// void cmix_dm_unblock_sender(int dm_instance_id, void* pubkey,
+//    int pubkey_len) {
+//    DMReceiverCallbacks.unblockSenderFn(dm_instance_id, pubkey, pubkey_len);
 // }
-// GoByteSlice cmix_dm_get_conversation(void* senderkey, int senderkey_len) {
-//    return DMReceiverCallbacks.getConversationFn(senderkey, senderkey_len);
+// GoByteSlice cmix_dm_get_conversation(int dm_instance_id, void* senderkey,
+//    int senderkey_len) {
+//    return DMReceiverCallbacks.getConversationFn(dm_instance_id, senderkey,
+//      senderkey_len);
 // }
-// GoByteSlice cmix_dm_get_conversations() {
-//    return DMReceiverCallbacks.getConversationsFn();
+// GoByteSlice cmix_dm_get_conversations(int dm_instance_id) {
+//    return DMReceiverCallbacks.getConversationsFn(dm_instance_id);
 // }
 // extern void cmix_dm_set_callbacks(DMReceiverCallbackFunctions cbs) {
 //     DMReceiverCallbacks.receiveFn = cbs.receiveFn;

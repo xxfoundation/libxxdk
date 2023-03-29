@@ -9,6 +9,7 @@ using System.Text;
 using System.CommandLine;
 using System.Reflection.PortableExecutable;
 using System.Reflection;
+using System.Net.NetworkInformation;
 
 namespace XX;
 
@@ -56,10 +57,20 @@ struct GoError
     public IntPtr Msg;
     public Int32 MsgLen;
 }
+/// <summary>
+/// GoByteSlice is a byte slice in the go format. Do not use unless
+/// internally to this module to implement a callback return to go. 
+/// </summary>
 [StructLayout(LayoutKind.Sequential)]
-struct GoByteSlice
+public struct GoByteSlice
 {
+    /// <summary>
+    /// Length of the slice
+    /// </summary>
     public Int64 len;
+    /// <summary>
+    /// Slice data
+    /// </summary>
     public IntPtr data;
 }
 /* Return type for LoadCmix */
@@ -414,12 +425,33 @@ public unsafe class Network
             String nickname, String text, Byte[] partnerkey, Byte[] senderkey,
             UInt32 dmToken, Int32 codeset, Int64 timestamp, Int64 round_id,
             Int64 status);
+
         /// <summary>
         /// Message was updated callback. Used to tell UI progress as
         /// message is sent through the network. 
         /// </summary>
         Int64 DMUpdateSentStatusCallbackFn(Int64 uuid, Byte[] message_id,
             Int64 timestamp, Int64 round_id, Int64 status);
+
+        /// <summary>
+        /// User is blocked callback. Used to tell UI a user is blocked.
+        /// </summary>
+        void DMBlockUser(Byte[] pubkey);
+
+        /// <summary>
+        /// User is unblocked callback. Used to tell UI a user is unblocked.
+        /// </summary>
+        void DMUnblockUser(Byte[] pubkey);
+
+        /// <summary>
+        /// GetConversation callback. Used to retrieve conversation object.
+        /// </summary>
+        Byte[] DMGetConversation(Byte[] senderkey);
+
+        /// <summary>
+        /// GetConversations callback. Used to retrieve all conversation objects.
+        /// </summary>
+        Byte[] DMGetConversations();
     }
 
     /// <summary>
@@ -678,6 +710,16 @@ public unsafe class Network
         Marshal.Copy(slice.data, res, 0, n);
         return res;
     }
+    private static GoByteSlice BytesToGoByteSlice(Byte[] bytes)
+    {
+        GoByteSlice slice = new();
+        int n = bytes.Length;
+        slice.len = (Int64)n;
+        slice.data = Marshal.AllocHGlobal(n);
+        Marshal.Copy(bytes, 0, slice.data, n);
+        return slice;
+    }
+
 
     /// <summary>
     /// Receive RAW direct message callback
@@ -733,6 +775,30 @@ public unsafe class Network
         long uuid,
         void* message_id, int message_id_len, long timestamp,
         long round_id, long status);
+
+    /// <summary>
+    /// User is blocked callback. Used to tell UI a user is blocked.
+    /// </summary>
+    public delegate void DMBlockUserCallbackFn(int dm_instance_id,
+        void* pubkey, int pubkey_len);
+
+    /// <summary>
+    /// User is unblocked callback. Used to tell UI a user is unblocked.
+    /// </summary>
+    public delegate void DMUnblockUserCallbackFn(int dm_instance_id,
+        void* pubkey, int pubkey_len);
+
+    /// <summary>
+    /// GetConversation callback. Used to retrieve conversation object.
+    /// </summary>
+    public delegate GoByteSlice DMGetConversationCallbackFn(int dm_instance_id,
+        void* senderkey, int senderkey_len);
+
+    /// <summary>
+    /// GetConversations callback. Used to retrieve all conversation objects.
+    /// </summary>
+    public delegate GoByteSlice DMGetConversationsCallbackFn(
+        int dm_instance_id);
 
     /// <summary>
     /// Pass through implementation for C Library Callback for
@@ -877,6 +943,70 @@ public unsafe class Network
         return cbs.DMUpdateSentStatusCallbackFn(uuid, MsgID,
             timestamp, round_id, status);
     }
+    /// <summary>
+    /// User is blocked callback. Used to tell UI a user is blocked.
+    /// </summary>
+    public static void DMBlockUser(int dm_instance_id,
+        void* pubkey, int pubkey_len)
+    {
+        DMCalllbackSingleton dm = DMCalllbackSingleton.GetInstance();
+        IDMCallbackFunctions cbs = dm.GetCallbacks(dm_instance_id);
+
+        Byte[] publicKey = ConvertCVoid(pubkey, pubkey_len);
+        Console.WriteLine("DMBlockUser {0}",
+            System.Convert.ToBase64String(publicKey));
+
+        cbs.DMBlockUser(publicKey);
+    }
+
+    /// <summary>
+    /// User is unblocked callback. Used to tell UI a user is unblocked.
+    /// </summary>
+    public static void DMUnblockUser(int dm_instance_id,
+        void* pubkey, int pubkey_len)
+    {
+        DMCalllbackSingleton dm = DMCalllbackSingleton.GetInstance();
+        IDMCallbackFunctions cbs = dm.GetCallbacks(dm_instance_id);
+
+        Byte[] publicKey = ConvertCVoid(pubkey, pubkey_len);
+        Console.WriteLine("DMUnblockUser {0}",
+            System.Convert.ToBase64String(publicKey));
+
+        cbs.DMUnblockUser(publicKey);
+    }
+
+    /// <summary>
+    /// GetConversation callback. Used to retrieve conversation object.
+    /// </summary>
+    public static GoByteSlice DMGetConversation(int dm_instance_id,
+        void* senderkey, int senderkey_len)
+    {
+        DMCalllbackSingleton dm = DMCalllbackSingleton.GetInstance();
+        IDMCallbackFunctions cbs = dm.GetCallbacks(dm_instance_id);
+
+        Byte[] publicKey = ConvertCVoid(senderkey, senderkey_len);
+        Console.WriteLine("DMGetConversation {0}",
+            System.Convert.ToBase64String(publicKey));
+
+        Byte[] retval = cbs.DMGetConversation(publicKey);
+
+        return BytesToGoByteSlice(retval);
+    }
+
+    /// <summary>
+    /// GetConversations callback. Used to retrieve all conversation objects.
+    /// </summary>
+    public static GoByteSlice DMGetConversations(int dm_instance_id)
+    {
+        DMCalllbackSingleton dm = DMCalllbackSingleton.GetInstance();
+        IDMCallbackFunctions cbs = dm.GetCallbacks(dm_instance_id);
+
+        Console.WriteLine("DMGetConversations");
+
+        Byte[] retval = cbs.DMGetConversations();
+
+        return BytesToGoByteSlice(retval);
+    }
 
     /// <summary>
     /// DMReceiverCallbackFunctions holds the callback function pointers
@@ -892,6 +1022,10 @@ public unsafe class Network
         DMReceiveReplyCallbackFn receiveReplyFn = DMReceiveReply;
         DMReceiveReactionCallbackFn receiveReactionFn = DMReceiveReaction;
         DMUpdateSentStatusCallbackFn updateSentStatusFn = DMUpdateSentStatus;
+        DMBlockUserCallbackFn blockUserFn = DMBlockUser;
+        DMUnblockUserCallbackFn unblockUserFn = DMUnblockUser;
+        DMGetConversationCallbackFn getConversationFn = DMGetConversation;
+        DMGetConversationsCallbackFn getConversationsFn = DMGetConversations;
     }
 
     /// <summary>
