@@ -55,11 +55,13 @@ package main
 //    long uuid,
 //    void* message_id, int message_id_len, long timestamp,
 //    long round_id, long status);
-// extern void cmix_dm_block_sender(void* pubkey, int pubkey_len);
-// extern void cmix_dm_unblock_sender(void* pubkey, int pubkey_len);
-// extern GoByteSlice cmix_dm_get_conversation(void* senderkey,
-//    int senderkey_len);
-// extern GoByteSlice cmix_dm_get_conversations();
+// extern void cmix_dm_block_sender(int dm_instance_id,
+//    void* pubkey, int pubkey_len);
+// extern void cmix_dm_unblock_sender(int dm_instance_id,
+//    void* pubkey, int pubkey_len);
+// extern GoByteSlice cmix_dm_get_conversation(int dm_instance_id,
+//    void* senderkey, int senderkey_len);
+// extern GoByteSlice cmix_dm_get_conversations(int dm_instance_id);
 // extern void cmix_dm_set_callbacks(DMReceiverCallbackFunctions cbs);
 import "C"
 
@@ -318,6 +320,19 @@ func cmix_dm_GetDMPubKey(dmInstanceID int32) (C.GoByteSlice, C.GoError) {
 	return makeBytes(dmClient.GetPublicKey()), makeError(nil)
 }
 
+//export cmix_dm_Send
+func cmix_dm_Send(dmInstanceID int32, partnerPubKey []byte,
+	dmToken int32, messageType int, plaintext []byte, leaseTimeMS int64,
+	cmixParamsJSON []byte) (C.GoByteSlice, C.GoError) {
+	dmClient, err := bindings.GetDMInstance(int(dmInstanceID))
+	if err != nil {
+		return makeBytes(nil), makeError(err)
+	}
+	sendReportJSON, err := dmClient.Send(partnerPubKey, dmToken,
+		messageType, plaintext, leaseTimeMS, cmixParamsJSON)
+	return makeBytes(sendReportJSON), makeError(err)
+}
+
 //export cmix_dm_SendText
 func cmix_dm_SendText(dmInstanceID int32, partnerPubKey []byte,
 	dmToken int32, message string, leaseTimeMS int64,
@@ -328,6 +343,32 @@ func cmix_dm_SendText(dmInstanceID int32, partnerPubKey []byte,
 	}
 	sendReportJSON, err := dmClient.SendText(partnerPubKey, dmToken,
 		message, leaseTimeMS, cmixParamsJSON)
+	return makeBytes(sendReportJSON), makeError(err)
+}
+
+//export cmix_dm_SendReply
+func cmix_dm_SendReply(dmInstanceID int32, partnerPubKey []byte,
+	dmToken int32, message string, replyTo []byte, leaseTimeMS int64,
+	cmixParamsJSON []byte) (C.GoByteSlice, C.GoError) {
+	dmClient, err := bindings.GetDMInstance(int(dmInstanceID))
+	if err != nil {
+		return makeBytes(nil), makeError(err)
+	}
+	sendReportJSON, err := dmClient.SendReply(partnerPubKey, dmToken,
+		message, replyTo, leaseTimeMS, cmixParamsJSON)
+	return makeBytes(sendReportJSON), makeError(err)
+}
+
+//export cmix_dm_SendReaction
+func cmix_dm_SendReaction(dmInstanceID int32, partnerPubKey []byte,
+	dmToken int32, message string, reactTo []byte, leaseTimeMS int64,
+	cmixParamsJSON []byte) (C.GoByteSlice, C.GoError) {
+	dmClient, err := bindings.GetDMInstance(int(dmInstanceID))
+	if err != nil {
+		return makeBytes(nil), makeError(err)
+	}
+	sendReportJSON, err := dmClient.SendReaction(partnerPubKey, dmToken,
+		message, reactTo, cmixParamsJSON)
 	return makeBytes(sendReportJSON), makeError(err)
 }
 
@@ -403,18 +444,18 @@ func (dmr *dmReceiver) UpdateSentStatus(uuid int64, messageID []byte,
 }
 
 func (dmr *dmReceiver) BlockSender(pubKey []byte) {
-	C.cmix_dm_block_sender(C.CBytes(pubKey),
+	C.cmix_dm_block_sender(C.int(dmr.dmClientID), C.CBytes(pubKey),
 		C.int(len(pubKey)))
 }
 
 func (dmr *dmReceiver) UnblockSender(pubKey []byte) {
-	C.cmix_dm_unblock_sender(C.CBytes(pubKey),
+	C.cmix_dm_unblock_sender(C.int(dmr.dmClientID), C.CBytes(pubKey),
 		C.int(len(pubKey)))
 }
 
 func (dmr *dmReceiver) GetConversation(senderPubKey []byte) []byte {
-	data2Copy := C.cmix_dm_get_conversation(C.CBytes(senderPubKey),
-		C.int(len(senderPubKey)))
+	data2Copy := C.cmix_dm_get_conversation(C.int(dmr.dmClientID),
+		C.CBytes(senderPubKey), C.int(len(senderPubKey)))
 	res := make([]byte, data2Copy.len)
 	buf := *(*[]byte)(data2Copy.data)
 	len := data2Copy.len
@@ -423,7 +464,7 @@ func (dmr *dmReceiver) GetConversation(senderPubKey []byte) []byte {
 }
 
 func (dmr *dmReceiver) GetConversations() []byte {
-	data2Copy := C.cmix_dm_get_conversations()
+	data2Copy := C.cmix_dm_get_conversations(C.int(dmr.dmClientID))
 	res := make([]byte, data2Copy.len)
 	buf := *(*[]byte)(data2Copy.data)
 	len := data2Copy.len
