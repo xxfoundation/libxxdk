@@ -301,12 +301,12 @@ func cmix_dm_NewDMClient(cMixInstanceID int32, codenameIdentity []byte,
 }
 
 //export cmix_dm_GetDMToken
-func cmix_dm_GetDMToken(dmInstanceID int32) (uint32, C.GoError) {
+func cmix_dm_GetDMToken(dmInstanceID int32) (int32, C.GoError) {
 	dmClient, err := bindings.GetDMInstance(int(dmInstanceID))
 	if err != nil {
 		return 0, makeError(err)
 	}
-	return dmClient.GetToken(), makeError(nil)
+	return int32(dmClient.GetToken()), makeError(nil)
 }
 
 //export cmix_dm_GetDMPubKey
@@ -320,7 +320,7 @@ func cmix_dm_GetDMPubKey(dmInstanceID int32) (C.GoByteSlice, C.GoError) {
 
 //export cmix_dm_SendText
 func cmix_dm_SendText(dmInstanceID int32, partnerPubKey []byte,
-	dmToken uint32, message string, leaseTimeMS int64,
+	dmToken int32, message string, leaseTimeMS int64,
 	cmixParamsJSON []byte) (C.GoByteSlice, C.GoError) {
 	dmClient, err := bindings.GetDMInstance(int(dmInstanceID))
 	if err != nil {
