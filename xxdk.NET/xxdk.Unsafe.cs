@@ -105,7 +105,7 @@ struct cmix_dm_NewDMClient_return
 [StructLayout(LayoutKind.Sequential)]
 struct cmix_dm_GetDMToken_return
 {
-    public GoUint32 Token;
+    public GoInt32 Token;
     public GoError Err;
 }
 /* Return type for cmix_dm_GetDMPubKey */
@@ -399,7 +399,7 @@ public unsafe class Network
         /// Receive RAW direct message callback
         /// </summary>
         Int64 DMReceiveCallbackFn(Byte[] message_id, String nickname,
-            Byte[] text, Byte[] partnerkey, Byte[] senderkey, UInt32 dmToken,
+            Byte[] text, Byte[] partnerkey, Byte[] senderkey, Int32 dmToken,
             Int32 codeset, Int64 timestamp, Int64 round_id, Int64 msg_type,
             Int64 status);
 
@@ -407,7 +407,7 @@ public unsafe class Network
         /// Received Text message callback
         /// </summary>
         Int64 DMReceiveTextCallbackFn(Byte[] message_id, String nickname,
-            String text, Byte[] partnerkey, Byte[] senderkey, UInt32 dmToken,
+            String text, Byte[] partnerkey, Byte[] senderkey, Int32 dmToken,
             Int32 codeset, Int64 timestamp, Int64 round_id, Int64 status);
 
         /// <summary>
@@ -415,7 +415,7 @@ public unsafe class Network
         /// </summary>
         Int64 DMReceiveReplyCallbackFn(Byte[] message_id, Byte[] reply_to,
             String nickname, String text, Byte[] partnerkey, Byte[] senderkey,
-            UInt32 dmToken, Int32 codeset, Int64 timestamp, Int64 round_id,
+            Int32 dmToken, Int32 codeset, Int64 timestamp, Int64 round_id,
             Int64 status);
 
         /// <summary>
@@ -423,7 +423,7 @@ public unsafe class Network
         /// </summary>
         Int64 DMReceiveReactionCallbackFn(Byte[] message_id, Byte[] reaction_to,
             String nickname, String text, Byte[] partnerkey, Byte[] senderkey,
-            UInt32 dmToken, Int32 codeset, Int64 timestamp, Int64 round_id,
+            Int32 dmToken, Int32 codeset, Int64 timestamp, Int64 round_id,
             Int64 status);
 
         /// <summary>
@@ -567,7 +567,7 @@ public unsafe class Network
         /// </summary>
         /// <returns>The DM Token for this DM Client</returns>
         /// <exception cref="Exception">Errors from Library</exception>
-        public UInt32 GetToken()
+        public Int32 GetToken()
         {
             cmix_dm_GetDMToken_return ret = CLIB.cmix_dm_GetDMToken(
                 this.dmInstanceID);
@@ -611,7 +611,7 @@ public unsafe class Network
         /// <returns>A JSON Encoded SendReport</returns>
         /// <exception cref="Exception">Error on send</exception>
         public Byte[] SendText(
-            Byte[] partnerPubKey, UInt32 dmToken,
+            Byte[] partnerPubKey, Int32 dmToken,
             String message, Int64 leaseTimeMS, Byte[] cmixParamsJSON)
         {
             GoSlice partnerKey = NewGoSlice(partnerPubKey);
@@ -730,7 +730,7 @@ public unsafe class Network
         void* text, int text_len,
         void* partnerkey, int partnerkey_len,
         void* senderkey, int senderkey_len,
-        uint dmToken, int codeset,
+        int dmToken, int codeset,
         long timestamp, long round_id, long msg_type, long status);
     /// <summary>
     /// Received Text message callback
@@ -741,7 +741,7 @@ public unsafe class Network
         char* text, int text_len,
         void* partnerkey, int partnerkey_len,
         void* senderkey, int senderkey_len,
-        uint dmToken, int codeset,
+        int dmToken, int codeset,
         long timestamp, long round_id, long status);
     /// <summary>
     /// Received Reply message callback
@@ -753,7 +753,7 @@ public unsafe class Network
         char* text, int text_len,
         void* partnerkey, int partnerkey_len,
         void* senderkey, int senderkey_len,
-        uint dmToken, int codeset,
+        int dmToken, int codeset,
         long timestamp, long round_id, long status);
     /// <summary>
     /// Received Reaction message callback
@@ -765,7 +765,7 @@ public unsafe class Network
         char* text, int text_len,
         void* partnerkey, int partnerkey_len,
         void* senderkey, int senderkey_len,
-        uint dmToken, int codeset,
+        int dmToken, int codeset,
         long timestamp, long round_id, long status);
     /// <summary>
     /// Message was updated callback. Used to tell UI progress as
@@ -810,7 +810,7 @@ public unsafe class Network
         void* text, int text_len,
         void* partnerkey, int partnerkey_len,
         void* senderkey, int senderkey_len,
-        uint dmToken, int codeset,
+        int dmToken, int codeset,
         long timestamp, long round_id, long msg_type, long status)
     {
         DMCalllbackSingleton dm = DMCalllbackSingleton.GetInstance();
@@ -840,7 +840,7 @@ public unsafe class Network
         char* text, int text_len,
         void* partnerkey, int partnerkey_len,
         void* senderkey, int senderkey_len,
-        uint dmToken, int codeset,
+        int dmToken, int codeset,
         long timestamp, long round_id, long status)
     {
         DMCalllbackSingleton dm = DMCalllbackSingleton.GetInstance();
@@ -871,7 +871,7 @@ public unsafe class Network
         char* text, int text_len,
         void* partnerkey, int partnerkey_len,
         void* senderkey, int senderkey_len,
-        uint dmToken, int codeset,
+        int dmToken, int codeset,
         long timestamp, long round_id, long status)
     {
         DMCalllbackSingleton dm = DMCalllbackSingleton.GetInstance();
@@ -903,7 +903,7 @@ public unsafe class Network
         char* text, int text_len,
         void* partnerkey, int partnerkey_len,
         void* senderkey, int senderkey_len,
-        uint dmToken, int codeset,
+        int dmToken, int codeset,
         long timestamp, long round_id, long status)
     {
         DMCalllbackSingleton dm = DMCalllbackSingleton.GetInstance();
@@ -1210,7 +1210,7 @@ public unsafe class Network
             GoInt32 dmInstanceID);
         [DllImport(xxdkLib)]
         public static extern cmix_dm_SendText_return cmix_dm_SendText(
-            GoInt32 dmInstanceID, GoSlice partnerPubKey, GoUint32 dmToken,
+            GoInt32 dmInstanceID, GoSlice partnerPubKey, GoInt32 dmToken,
             GoString message, GoInt64 leaseTimeMS, GoSlice cmixParamsJSON);
 
     }

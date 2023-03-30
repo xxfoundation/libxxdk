@@ -22,7 +22,7 @@ public class Program
 {
 
     static void Main(string? ndf = null, string? stateDir = null,
-        string? partnerKey = null, uint partnerToken= 0, string? message = null,
+        string? partnerKey = null, int partnerToken= 0, string? message = null,
         int wait = 20, Int64 receiveCount = 1)
     {
         if (string.IsNullOrWhiteSpace(ndf))
@@ -88,12 +88,12 @@ public class Program
 
         DirectMessaging DM = new(net, dmID, "Hello", dmCbs);
 
-        UInt32 myToken = DM.GetToken();
+        Int32 myToken = DM.GetToken();
         Byte[] pubKey = DM.GetPubKey();
         Console.WriteLine("DMPUBKEY: " + System.Convert.ToBase64String(pubKey));
         Console.WriteLine("DMTOKEN: " + myToken);
 
-        UInt32 partnerDMToken;
+        Int32 partnerDMToken;
         Byte[] partnerKeyBytes;
         if (string.IsNullOrWhiteSpace(partnerKey) || partnerToken == 0)
         {
@@ -187,7 +187,7 @@ public class Program
         /// Receive RAW direct message callback
         /// </summary>
         public Int64 DMReceiveCallbackFn(Byte[] message_id, String nickname,
-            Byte[] text, Byte[] partnerkey, Byte[] senderkey, UInt32 dmToken,
+            Byte[] text, Byte[] partnerkey, Byte[] senderkey, Int32 dmToken,
             Int32 codeset, Int64 timestamp, Int64 round_id, Int64 msg_type,
             Int64 status)
         {
@@ -200,7 +200,7 @@ public class Program
         /// Received Text message callback
         /// </summary>
         public Int64 DMReceiveTextCallbackFn(Byte[] message_id, String nickname,
-            String text, Byte[] partnerkey, Byte[] senderkey, UInt32 dmToken,
+            String text, Byte[] partnerkey, Byte[] senderkey, Int32 dmToken,
             Int32 codeset, Int64 timestamp, Int64 round_id, Int64 status)
         {
             Console.WriteLine("DMReceiveTextCallbackFn");
@@ -214,7 +214,7 @@ public class Program
         /// </summary>
         public Int64 DMReceiveReplyCallbackFn(Byte[] message_id, Byte[] reply_to,
             String nickname, String text, Byte[] partnerkey, Byte[] senderkey,
-            UInt32 dmToken, Int32 codeset, Int64 timestamp, Int64 round_id,
+            Int32 dmToken, Int32 codeset, Int64 timestamp, Int64 round_id,
             Int64 status)
         {
             Console.WriteLine("DMReceiveReplyCallbackFn");
@@ -228,7 +228,7 @@ public class Program
         /// </summary>
         public Int64 DMReceiveReactionCallbackFn(Byte[] message_id, Byte[] reaction_to,
             String nickname, String text, Byte[] partnerkey, Byte[] senderkey,
-            UInt32 dmToken, Int32 codeset, Int64 timestamp, Int64 round_id,
+            Int32 dmToken, Int32 codeset, Int64 timestamp, Int64 round_id,
             Int64 status)
         {
             Console.WriteLine("DMReceiveReactionCallbackFn");
