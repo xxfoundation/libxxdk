@@ -44,7 +44,7 @@ public class Program
         // Setup DMReceiver Callbacks with the library.
         // TODO: The callbacks should be settable by the user, for now
         //       all we're doing is printing the messsages to console...
-        XX.Network.SetupReceiverCallbacks();
+        XX.Network.SetupReceiverRouter();
 
         Console.WriteLine(
             "#########################################" +
@@ -170,7 +170,7 @@ public class Program
 
 
     }
-    private class DMCallbacks : XX.Network.IDMCallbackFunctions
+    private class DMCallbacks : XX.Network.IDMReceiver
     {
         private Int64 numReceived;
         public DMCallbacks()
@@ -186,7 +186,7 @@ public class Program
         /// <summary>
         /// Receive RAW direct message callback
         /// </summary>
-        public Int64 DMReceiveCallbackFn(Byte[] message_id, String nickname,
+        public Int64 Receive(Byte[] message_id, String nickname,
             Byte[] text, Byte[] partnerkey, Byte[] senderkey, Int32 dmToken,
             Int32 codeset, Int64 timestamp, Int64 round_id, Int64 msg_type,
             Int64 status)
@@ -199,7 +199,7 @@ public class Program
         /// <summary>
         /// Received Text message callback
         /// </summary>
-        public Int64 DMReceiveTextCallbackFn(Byte[] message_id, String nickname,
+        public Int64 ReceiveText(Byte[] message_id, String nickname,
             String text, Byte[] partnerkey, Byte[] senderkey, Int32 dmToken,
             Int32 codeset, Int64 timestamp, Int64 round_id, Int64 status)
         {
@@ -212,7 +212,7 @@ public class Program
         /// <summary>
         /// Received Reply message callback
         /// </summary>
-        public Int64 DMReceiveReplyCallbackFn(Byte[] message_id, Byte[] reply_to,
+        public Int64 ReceiveReply(Byte[] message_id, Byte[] reply_to,
             String nickname, String text, Byte[] partnerkey, Byte[] senderkey,
             Int32 dmToken, Int32 codeset, Int64 timestamp, Int64 round_id,
             Int64 status)
@@ -226,7 +226,7 @@ public class Program
         /// <summary>
         /// Received Reaction message callback
         /// </summary>
-        public Int64 DMReceiveReactionCallbackFn(Byte[] message_id, Byte[] reaction_to,
+        public Int64 ReceiveReaction(Byte[] message_id, Byte[] reaction_to,
             String nickname, String text, Byte[] partnerkey, Byte[] senderkey,
             Int32 dmToken, Int32 codeset, Int64 timestamp, Int64 round_id,
             Int64 status)
@@ -240,7 +240,7 @@ public class Program
         /// Message was updated callback. Used to tell UI progress as
         /// message is sent through the network. 
         /// </summary>
-        public Int64 DMUpdateSentStatusCallbackFn(Int64 uuid, Byte[] message_id,
+        public Int64 UpdateSentStatus(Int64 uuid, Byte[] message_id,
             Int64 timestamp, Int64 round_id, Int64 status)
         {
             Console.WriteLine("DMUpdateSentStatusCallbackFn");
@@ -248,23 +248,23 @@ public class Program
             return this.numReceived;
         }
 
-        public void DMBlockUser(byte[] pubkey)
+        public void BlockUser(byte[] pubkey)
         {
             return;
         }
 
-        public void DMUnblockUser(byte[] pubkey)
+        public void UnblockUser(byte[] pubkey)
         {
             return;
         }
 
-        public byte[] DMGetConversation(byte[] senderkey)
+        public byte[] GetConversation(byte[] senderkey)
         {
             Byte[] conv = Array.Empty<byte>();
             return conv;
         }
 
-        public byte[] DMGetConversations()
+        public byte[] GetConversations()
         {
             Byte[] conv = Array.Empty<byte>();
             return conv;

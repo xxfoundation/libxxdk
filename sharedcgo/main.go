@@ -62,7 +62,7 @@ package main
 // extern GoByteSlice cmix_dm_get_conversation(int dm_instance_id,
 //    void* senderkey, int senderkey_len);
 // extern GoByteSlice cmix_dm_get_conversations(int dm_instance_id);
-// extern void cmix_dm_set_callbacks(DMReceiverCallbackFunctions cbs);
+// extern void cmix_dm_set_router(DMReceiverRouterFunctions cbs);
 import "C"
 
 import (
