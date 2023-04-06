@@ -8,6 +8,8 @@ using System.Security.Principal;
 using System.Text;
 using System.CommandLine;
 using System.Reflection.PortableExecutable;
+using System.Reflection;
+using System.Net.NetworkInformation;
 
 namespace XX;
 
@@ -55,10 +57,20 @@ struct GoError
     public IntPtr Msg;
     public Int32 MsgLen;
 }
+/// <summary>
+/// GoByteSlice is a byte slice in the go format. Do not use unless
+/// internally to this module to implement a callback return to go. 
+/// </summary>
 [StructLayout(LayoutKind.Sequential)]
-struct GoByteSlice
+public struct GoByteSlice
 {
+    /// <summary>
+    /// Length of the slice
+    /// </summary>
     public Int64 len;
+    /// <summary>
+    /// Slice data
+    /// </summary>
     public IntPtr data;
 }
 /* Return type for LoadCmix */
@@ -93,7 +105,7 @@ struct cmix_dm_NewDMClient_return
 [StructLayout(LayoutKind.Sequential)]
 struct cmix_dm_GetDMToken_return
 {
-    public GoUint32 Token;
+    public GoInt32 Token;
     public GoError Err;
 }
 /* Return type for cmix_dm_GetDMPubKey */
@@ -163,8 +175,24 @@ public unsafe class Network
     /// <summary>
     /// cMix Functions for connecting with the XX network
     /// </summary>
-    public static class CMix
+    public class CMix
     {
+        private Int32 cMixInstanceID;
+
+        // Use LoadCmix to get a proper CMix object.
+        // NewCmix must first be called to instantiate the object.
+        private CMix()
+        {
+            this.cMixInstanceID = -1;
+        }
+
+        /// <summary>Return the instance id handler used by the cMix library.
+        /// -1 indicates an uninalizated insance.</summary>
+        public Int32 GetInstanceID()
+        {
+            return this.cMixInstanceID;
+        }
+
         /// <summary>
         /// Create a new cMix instantiation. This does not
         /// connect to the network, but merely sets up storage and
@@ -211,7 +239,7 @@ public unsafe class Network
         /// <returns>CMix Instance Identifier (a number, acts
         /// like a file descriptor)</returns>
         /// <exception cref="Exception">Errors occured during setup</exception>
-        public static int LoadCmix(String storageDir, Byte[] password,
+        public static CMix LoadCmix(String storageDir, Byte[] password,
             Byte[] cmixParamsJSON)
         {
             GoString storageDirGS = NewGoString(storageDir);
@@ -232,19 +260,20 @@ public unsafe class Network
                 throw new Exception(errMsg);
             }
 
-            return ret.cMixInstanceID;
+            CMix cMix = new CMix();
+            cMix.cMixInstanceID = ret.cMixInstanceID;
+            return cMix;
         }
 
         /// <summary>
         /// cmix_GetReceptionID returns the current default reception ID
         /// </summary>
-        /// <param name="cMixInstanceID">Instance ID from LoadCmix</param>
         /// <returns>The cMix Reception ID, used to receive RAW cMix Messages</returns>
         /// <exception cref="Exception">Error occured in library</exception>
-        public static Byte[] GetReceptionID(Int32 cMixInstanceID)
+        public Byte[] GetReceptionID()
         {
             cmix_GetReceptionID_return rid = CLIB.cmix_GetReceptionID(
-                cMixInstanceID);
+                this.cMixInstanceID);
             GoError err = rid.Err;
             if (err.IsError != 0)
             {
@@ -257,14 +286,13 @@ public unsafe class Network
         /// <summary>
         /// EKVGet retrieves a value from secure Key-Value storage.
         /// </summary>
-        /// <param name="cMixInstanceID">Instance ID for cMix</param>
         /// <param name="key">The key associated with the value</param>
         /// <returns>Bytes of the value</returns>
         /// <exception cref="Exception">Error or if key cannot be found</exception>
-        public static Byte[] EKVGet(Int32 cMixInstanceID, String key)
+        public Byte[] EKVGet(String key)
         {
             GoString goKey = NewGoString(key);
-            cmix_EKVGet_return ret = CLIB.cmix_EKVGet(cMixInstanceID, goKey);
+            cmix_EKVGet_return ret = CLIB.cmix_EKVGet(this.cMixInstanceID, goKey);
 
             GoError err = ret.Err;
             if (err.IsError != 0)
@@ -278,16 +306,15 @@ public unsafe class Network
         /// <summary>
         /// EKVSet a value in the Key value storage
         /// </summary>
-        /// <param name="cMixInstanceID">Instance ID for cMix</param>
         /// <param name="key">The key associated with the value</param>
         /// <param name="value">The bytes to store as the value</param>
         /// <exception cref="Exception">Write errors</exception>
-        public static void EKVSet(Int32 cMixInstanceID, String key,
+        public void EKVSet(String key,
             Byte[] value)
         {
             GoString goKey = NewGoString(key);
             GoSlice goVal = NewGoSlice(value);
-            GoError err = CLIB.cmix_EKVSet(cMixInstanceID, goKey, goVal);
+            GoError err = CLIB.cmix_EKVSet(this.cMixInstanceID, goKey, goVal);
             if (err.IsError != 0)
             {
                 String errMsg = ConvertCharPtr(err.Msg, err.MsgLen);
@@ -301,15 +328,13 @@ public unsafe class Network
         /// <summary>
         /// Start following the cMix network. 
         /// </summary>
-        /// <param name="cMixInstanceID">Instance ID for cMix</param>
         /// <param name="timeoutMS">Error out if we haven't connected
         /// by this many milliseconds</param>
         /// <exception cref="Exception">Timeout or other error on
         /// connection</exception>
-        public static void StartNetworkFollower(Int32 cMixInstanceID,
-            Int32 timeoutMS)
+        public void StartNetworkFollower(Int32 timeoutMS)
         {
-            GoError err = CLIB.cmix_StartNetworkFollower(cMixInstanceID,
+            GoError err = CLIB.cmix_StartNetworkFollower(this.cMixInstanceID,
                 timeoutMS);
             if (err.IsError != 0)
             {
@@ -321,10 +346,9 @@ public unsafe class Network
         /// Stop the network follower. You should call this any time
         /// your app goes to the background. 
         /// </summary>
-        /// <param name="cMixInstanceID">Instance ID for cMix</param>
         /// <exception cref="Exception">Timeout or other error on
         /// shutdown</exception>
-        public static void StopNetworkFollower(Int32 cMixInstanceID)
+        public void StopNetworkFollower()
         {
             GoError err = CLIB.cmix_StopNetworkFollower(cMixInstanceID);
             if (err.IsError != 0)
@@ -337,14 +361,12 @@ public unsafe class Network
         /// Wait timeoutMS or until you are caught up with the network.
         /// Use this before you send a message.
         /// </summary>
-        /// <param name="cMixInstanceID">Instance Id for cMix</param>
         /// <param name="timeoutMS">Timeout in milliseconds</param>
         /// <exception cref="Exception">Timed out or other send
         /// error</exception>
-        public static void WaitForNetwork(Int32 cMixInstanceID,
-            Int32 timeoutMS)
+        public void WaitForNetwork(Int32 timeoutMS)
         {
-            GoError err = CLIB.cmix_WaitForNetwork(cMixInstanceID, timeoutMS);
+            GoError err = CLIB.cmix_WaitForNetwork(this.cMixInstanceID, timeoutMS);
             if (err.IsError != 0)
             {
                 String errMsg = ConvertCharPtr(err.Msg, err.MsgLen);
@@ -355,11 +377,10 @@ public unsafe class Network
         /// Are we ready to send? This is a quick check you can make. Useful
         /// for showing the UI if you are connected.
         /// </summary>
-        /// <param name="cMixInstanceID">cMix Instance ID</param>
         /// <returns>If we are connected</returns>
-        public static Boolean ReadyToSend(Int32 cMixInstanceID)
+        public Boolean ReadyToSend()
         {
-            GoUint8 ready = CLIB.cmix_ReadyToSend(cMixInstanceID);
+            GoUint8 ready = CLIB.cmix_ReadyToSend(this.cMixInstanceID);
             if (ready != 0)
             {
                 return true;
@@ -369,25 +390,162 @@ public unsafe class Network
     }
 
     /// <summary>
+    /// IDMCallbackFunctions is the interface for DM Callbacks. Users
+    /// must pass an impelementation of this interface to the DM object.
+    /// </summary>
+    public interface IDMReceiver
+    {
+        /// <summary>
+        /// Receive RAW direct message callback
+        /// </summary>
+        Int64 Receive(Byte[] message_id, String nickname,
+            Byte[] text, Byte[] partnerkey, Byte[] senderkey, Int32 dmToken,
+            Int32 codeset, Int64 timestamp, Int64 round_id, Int64 msg_type,
+            Int64 status);
+
+        /// <summary>
+        /// Received Text message callback
+        /// </summary>
+        Int64 ReceiveText(Byte[] message_id, String nickname,
+            String text, Byte[] partnerkey, Byte[] senderkey, Int32 dmToken,
+            Int32 codeset, Int64 timestamp, Int64 round_id, Int64 status);
+
+        /// <summary>
+        /// Received Reply message callback
+        /// </summary>
+        Int64 ReceiveReply(Byte[] message_id, Byte[] reply_to,
+            String nickname, String text, Byte[] partnerkey, Byte[] senderkey,
+            Int32 dmToken, Int32 codeset, Int64 timestamp, Int64 round_id,
+            Int64 status);
+
+        /// <summary>
+        /// Received Reaction message callback
+        /// </summary>
+        Int64 ReceiveReaction(Byte[] message_id, Byte[] reaction_to,
+            String nickname, String text, Byte[] partnerkey, Byte[] senderkey,
+            Int32 dmToken, Int32 codeset, Int64 timestamp, Int64 round_id,
+            Int64 status);
+
+        /// <summary>
+        /// Message was updated callback. Used to tell UI progress as
+        /// message is sent through the network. 
+        /// </summary>
+        Int64 UpdateSentStatus(Int64 uuid, Byte[] message_id,
+            Int64 timestamp, Int64 round_id, Int64 status);
+
+        /// <summary>
+        /// User is blocked callback. Used to tell UI a user is blocked.
+        /// </summary>
+        void BlockUser(Byte[] pubkey);
+
+        /// <summary>
+        /// User is unblocked callback. Used to tell UI a user is unblocked.
+        /// </summary>
+        void UnblockUser(Byte[] pubkey);
+
+        /// <summary>
+        /// GetConversation callback. Used to retrieve conversation object.
+        /// </summary>
+        Byte[] GetConversation(Byte[] senderkey);
+
+        /// <summary>
+        /// GetConversations callback. Used to retrieve all conversation objects.
+        /// </summary>
+        Byte[] GetConversations();
+    }
+
+    /// <summary>
+    /// DMReceiverRounder is used by the c library callback functions
+    /// (implemented below) to route to and call the registered DMReceiver
+    /// functions for a given DM Instance.
+    /// </summary>
+    public sealed class DMReceiverRouter
+    {
+        private Dictionary<Int32, IDMReceiver> CBs;
+        private static DMReceiverRouter? Instance = null;
+
+        /// <summary>
+        /// GetInstance Singleton accessor
+        /// </summary>
+        /// <returns>the DMCallbackSingleton instance</returns>
+        public static DMReceiverRouter GetInstance()
+        {
+            //NOTE: This is not thread safe, but since it's initialized on
+            // start it should be OK. 
+            if (Instance == null)
+            {
+                Instance = new DMReceiverRouter();
+            }
+
+            return Instance;
+        }
+
+        /// <summary>
+        /// Private DMSingleton constructor, can only be called by GetInstance
+        /// </summary>
+        private DMReceiverRouter()
+        {
+            this.CBs = new Dictionary<Int32, IDMReceiver>();
+        }
+
+        /// <summary>
+        /// SetCallbacks sets callbacks for a specific dm InstanceID.
+        /// </summary>
+        /// <param name="DMInstanceID">The DirectMessaging instance
+        /// this is for</param>
+        /// <param name="dmCBs">the callbacks implementation to use</param>
+        /// <exception cref="Exception">exception when the interface
+        /// does not exist.</exception>
+        public void SetCallbacks(Int32 DMInstanceID, IDMReceiver dmCBs)
+        {
+            if (dmCBs == null)
+            {
+                throw new Exception("must implement IDMCallbackFunctions");
+            }
+            // NOTE: Used add here to cause a throw if duplicate key is used.
+            this.CBs.Add(DMInstanceID, dmCBs);
+        }
+
+        /// <summary>
+        /// Get the callbacks for a specific DM instance
+        /// </summary>
+        /// <param name="DMInstanceID">the dm instance we want the
+        /// callbacks for.</param>
+        /// <returns>the callbacks implementation for the specified
+        /// dm instance.</returns>
+        public IDMReceiver GetCallbacks(Int32 DMInstanceID)
+        {
+            return this.CBs[DMInstanceID];
+        }
+    }
+
+
+    /// <summary>
     /// Direct Message functionality
     /// </summary>
-    public static class DirectMessaging
+    public class DirectMessaging
     {
+        private Int32 cMixInstanceID;
+        private Int32 dmInstanceID;
+
         /// <summary>
         /// Create a DMClient
         /// </summary>
-        /// <param name="cMixInstanceID">The cMix Instance Id to use</param>
+        /// <param name="cMixInstance">cMix network interface to use</param>
         /// <param name="codenameIdentity">our Codename for DMs</param>
         /// <param name="secretPassphrase">Our codename password</param>
+        /// <param name="Callbacks">Implementation of callbacks for DM</param>
         /// <returns>DM Client Instance IE</returns>
         /// <exception cref="Exception">Errors on setup</exception>
-        public static Int32 NewClient(Int32 cMixInstanceID,
-            Byte[] codenameIdentity, String secretPassphrase)
+        public DirectMessaging(CMix cMixInstance,
+            Byte[] codenameIdentity, String secretPassphrase,
+            IDMReceiver Callbacks)
         {
+            this.cMixInstanceID = cMixInstance.GetInstanceID();
             GoSlice id = NewGoSlice(codenameIdentity);
             GoString secret = NewGoString(secretPassphrase);
             cmix_dm_NewDMClient_return ret = CLIB.cmix_dm_NewDMClient(
-                cMixInstanceID, id, secret);
+                this.cMixInstanceID, id, secret);
 
             FreeGoSlice(id);
             FreeGoString(secret);
@@ -398,20 +556,21 @@ public unsafe class Network
                 String errMsg = ConvertCharPtr(err.Msg, err.MsgLen);
                 throw new Exception(errMsg);
             }
-            return ret.DMInstanceID;
+            this.dmInstanceID = ret.DMInstanceID;
+            DMReceiverRouter cb = DMReceiverRouter.GetInstance();
+            cb.SetCallbacks(this.dmInstanceID, Callbacks);
         }
 
         /// <summary>
         /// Get our generated DMToken, this is required to send to a
         /// Direct messaging partner. Knowing their pubkey is not enough.
         /// </summary>
-        /// <param name="dmInstanceID">DM Client ID</param>
         /// <returns>The DM Token for this DM Client</returns>
         /// <exception cref="Exception">Errors from Library</exception>
-        public static UInt32 GetToken(Int32 dmInstanceID)
+        public Int32 GetToken()
         {
             cmix_dm_GetDMToken_return ret = CLIB.cmix_dm_GetDMToken(
-                dmInstanceID);
+                this.dmInstanceID);
             GoError err = ret.Err;
             if (err.IsError != 0)
             {
@@ -423,13 +582,12 @@ public unsafe class Network
         /// <summary>
         /// The Codename Public Key. These are ED25519 curve keys. 
         /// </summary>
-        /// <param name="dmInstanceID">DM Client ID</param>
         /// <returns>Bytes of the public key</returns>
         /// <exception cref="Exception">Error from Library</exception>
-        public static Byte[] GetPubKey(Int32 dmInstanceID)
+        public Byte[] GetPubKey()
         {
             cmix_dm_GetDMPubKey_return ret = CLIB.cmix_dm_GetDMPubKey(
-                dmInstanceID);
+                this.dmInstanceID);
             GoError err = ret.Err;
             if (err.IsError != 0)
             {
@@ -442,7 +600,6 @@ public unsafe class Network
         /// <summary>
         /// SendText sends a text message type as a direct message.
         /// </summary>
-        /// <param name="dmInstanceID">DM Client ID</param>
         /// <param name="partnerPubKey">Public key bytes of the partner</param>
         /// <param name="dmToken">DM token of the partner</param>
         /// <param name="message">Your message</param>
@@ -453,14 +610,14 @@ public unsafe class Network
         /// specific.</param>
         /// <returns>A JSON Encoded SendReport</returns>
         /// <exception cref="Exception">Error on send</exception>
-        public static Byte[] SendText(Int32 dmInstanceID,
-            Byte[] partnerPubKey, UInt32 dmToken,
+        public Byte[] SendText(
+            Byte[] partnerPubKey, Int32 dmToken,
             String message, Int64 leaseTimeMS, Byte[] cmixParamsJSON)
         {
             GoSlice partnerKey = NewGoSlice(partnerPubKey);
             GoString goMsg = NewGoString(message);
             GoSlice cmixParams = NewGoSlice(cmixParamsJSON);
-            cmix_dm_SendText_return ret = CLIB.cmix_dm_SendText(dmInstanceID,
+            cmix_dm_SendText_return ret = CLIB.cmix_dm_SendText(this.dmInstanceID,
                 partnerKey, dmToken, goMsg, leaseTimeMS, cmixParams);
 
             GoError err = ret.Err;
@@ -481,12 +638,12 @@ public unsafe class Network
     }
 
     /// <summary>
-    /// Setup receiver callbacks (FIXME).
+    /// Setup receiver routes
     /// </summary>
-    public static void SetupReceiverCallbacks()
+    public static void SetupReceiverRouter()
     {
-        DMReceiverCallbackFunctions CBs = new DMReceiverCallbackFunctions();
-        CLIB.cmix_dm_set_callbacks(CBs);
+        DMReceiverRouterFunctions CBs = new DMReceiverRouterFunctions();
+        CLIB.cmix_dm_set_router(CBs);
     }
 
     private static string ConvertGoString(GoString gs)
@@ -553,6 +710,16 @@ public unsafe class Network
         Marshal.Copy(slice.data, res, 0, n);
         return res;
     }
+    private static GoByteSlice BytesToGoByteSlice(Byte[] bytes)
+    {
+        GoByteSlice slice = new();
+        int n = bytes.Length;
+        slice.len = (Int64)n;
+        slice.data = Marshal.AllocHGlobal(n);
+        Marshal.Copy(bytes, 0, slice.data, n);
+        return slice;
+    }
+
 
     /// <summary>
     /// Receive RAW direct message callback
@@ -563,7 +730,7 @@ public unsafe class Network
         void* text, int text_len,
         void* partnerkey, int partnerkey_len,
         void* senderkey, int senderkey_len,
-        uint dmToken, int codeset,
+        int dmToken, int codeset,
         long timestamp, long round_id, long msg_type, long status);
     /// <summary>
     /// Received Text message callback
@@ -574,7 +741,7 @@ public unsafe class Network
         char* text, int text_len,
         void* partnerkey, int partnerkey_len,
         void* senderkey, int senderkey_len,
-        uint dmToken, int codeset,
+        int dmToken, int codeset,
         long timestamp, long round_id, long status);
     /// <summary>
     /// Received Reply message callback
@@ -586,7 +753,7 @@ public unsafe class Network
         char* text, int text_len,
         void* partnerkey, int partnerkey_len,
         void* senderkey, int senderkey_len,
-        uint dmToken, int codeset,
+        int dmToken, int codeset,
         long timestamp, long round_id, long status);
     /// <summary>
     /// Received Reaction message callback
@@ -598,7 +765,7 @@ public unsafe class Network
         char* text, int text_len,
         void* partnerkey, int partnerkey_len,
         void* senderkey, int senderkey_len,
-        uint dmToken, int codeset,
+        int dmToken, int codeset,
         long timestamp, long round_id, long status);
     /// <summary>
     /// Message was updated callback. Used to tell UI progress as
@@ -610,7 +777,32 @@ public unsafe class Network
         long round_id, long status);
 
     /// <summary>
-    /// Dummy implementation of callback
+    /// User is blocked callback. Used to tell UI a user is blocked.
+    /// </summary>
+    public delegate void DMBlockUserCallbackFn(int dm_instance_id,
+        void* pubkey, int pubkey_len);
+
+    /// <summary>
+    /// User is unblocked callback. Used to tell UI a user is unblocked.
+    /// </summary>
+    public delegate void DMUnblockUserCallbackFn(int dm_instance_id,
+        void* pubkey, int pubkey_len);
+
+    /// <summary>
+    /// GetConversation callback. Used to retrieve conversation object.
+    /// </summary>
+    public delegate GoByteSlice DMGetConversationCallbackFn(int dm_instance_id,
+        void* senderkey, int senderkey_len);
+
+    /// <summary>
+    /// GetConversations callback. Used to retrieve all conversation objects.
+    /// </summary>
+    public delegate GoByteSlice DMGetConversationsCallbackFn(
+        int dm_instance_id);
+
+    /// <summary>
+    /// Pass through implementation for C Library Callback for
+    /// DMReceive
     /// </summary>
     public static long DMReceive(int dm_instance_id,
         void* message_id, int message_id_len,
@@ -618,130 +810,336 @@ public unsafe class Network
         void* text, int text_len,
         void* partnerkey, int partnerkey_len,
         void* senderkey, int senderkey_len,
-        uint dmToken, int codeset,
+        int dmToken, int codeset,
         long timestamp, long round_id, long msg_type, long status)
     {
+        DMReceiverRouter dm = DMReceiverRouter.GetInstance();
+        IDMReceiver cbs = dm.GetCallbacks(dm_instance_id);
+
+        Byte[] MsgID = ConvertCVoid(message_id, message_id_len);
+        String Nick = ConvertCChar(nickname, nickname_len);
+        Byte[] Text = ConvertCVoid(text, text_len);
         Byte[] partnerKey = ConvertCVoid(partnerkey, partnerkey_len);
         Byte[] senderKey = ConvertCVoid(senderkey, senderkey_len);
-        Byte[] Message = ConvertCVoid(text, text_len);
-        Console.WriteLine("DMReceive: { 0}, { 1}: { 2}",
-            System.Convert.ToBase64String(partnerKey), System.Convert.ToBase64String(senderKey), dmToken, Message);
-        return 0;
+
+        Console.WriteLine("DMReceive: {0}, {1}: {2}",
+            System.Convert.ToBase64String(partnerKey),
+            System.Convert.ToBase64String(senderKey), dmToken, Text);
+
+        return cbs.Receive(MsgID,
+            Nick, Text, partnerKey, senderKey, dmToken, codeset, timestamp,
+            round_id, msg_type, status);
     }
     /// <summary>
-    /// Dummy implementation of callback
+    /// Pass through implementation for C Library Callback for
+    /// DMReceiveText
     /// </summary>
     public static long DMReceiveText(int dm_instance_id,
-        void* mesage_id, int message_id_len,
+        void* message_id, int message_id_len,
         char* nickname, int nickname_len,
         char* text, int text_len,
         void* partnerkey, int partnerkey_len,
         void* senderkey, int senderkey_len,
-        uint dmToken, int codeset,
+        int dmToken, int codeset,
         long timestamp, long round_id, long status)
     {
+        DMReceiverRouter dm = DMReceiverRouter.GetInstance();
+        IDMReceiver cbs = dm.GetCallbacks(dm_instance_id);
+
+        Byte[] MsgID = ConvertCVoid(message_id, message_id_len);
+        String Nick = ConvertCChar(nickname, nickname_len);
+        String Text = ConvertCChar(text, text_len);
         Byte[] partnerKey = ConvertCVoid(partnerkey, partnerkey_len);
         Byte[] senderKey = ConvertCVoid(senderkey, senderkey_len);
-        String Message = ConvertCChar(text, text_len);
+
         Console.WriteLine("DMReceiveText: {0}->{1}, {2}: {3}",
             System.Convert.ToBase64String(partnerKey),
-            System.Convert.ToBase64String(senderKey), dmToken, Message);
-        return 0;
+            System.Convert.ToBase64String(senderKey), dmToken, Text);
+
+        return cbs.ReceiveText(MsgID,
+            Nick, Text, partnerKey, senderKey, dmToken, codeset, timestamp,
+            round_id, status);
     }
     /// <summary>
-    /// Dummy implementation of callback
+    /// Pass through implementation for C Library Callback for
+    /// DMReceiveReply
     /// </summary>
     public static long DMReceiveReply(int dm_instance_id,
-        void* mesage_id, int message_id_len,
+        void* message_id, int message_id_len,
         void* reply_to, int reply_to_len,
         char* nickname, int nickname_len,
         char* text, int text_len,
         void* partnerkey, int partnerkey_len,
         void* senderkey, int senderkey_len,
-        uint dmToken, int codeset,
+        int dmToken, int codeset,
         long timestamp, long round_id, long status)
     {
+        DMReceiverRouter dm = DMReceiverRouter.GetInstance();
+        IDMReceiver cbs = dm.GetCallbacks(dm_instance_id);
+
+        Byte[] MsgID = ConvertCVoid(message_id, message_id_len);
+        Byte[] ReplyTo = ConvertCVoid(reply_to, reply_to_len);
+        String Nick = ConvertCChar(nickname, nickname_len);
+        String Text = ConvertCChar(text, text_len);
         Byte[] partnerKey = ConvertCVoid(partnerkey, partnerkey_len);
         Byte[] senderKey = ConvertCVoid(senderkey, senderkey_len);
-        String Message = ConvertCChar(text, text_len);
+
         Console.WriteLine("DMReceiveReply {0}->{1}, {2}: {3}",
             System.Convert.ToBase64String(partnerKey),
-            System.Convert.ToBase64String(senderKey), dmToken, Message);
-        return 0;
+            System.Convert.ToBase64String(senderKey), dmToken, Text);
+
+        return cbs.ReceiveReply(MsgID, ReplyTo,
+            Nick, Text, partnerKey, senderKey, dmToken, codeset, timestamp,
+            round_id, status);
     }
     /// <summary>
-    /// Dummy implementation of callback
+    /// Pass through implementation for C Library Callback for
+    /// DMReceiveReaction
     /// </summary>
     public static long DMReceiveReaction(int dm_instance_id,
-        void* mesage_id, int message_id_len,
+        void* message_id, int message_id_len,
         void* reaction_to, int reaction_to_len,
         char* nickname, int nickname_len,
         char* text, int text_len,
         void* partnerkey, int partnerkey_len,
         void* senderkey, int senderkey_len,
-        uint dmToken, int codeset,
+        int dmToken, int codeset,
         long timestamp, long round_id, long status)
     {
+        DMReceiverRouter dm = DMReceiverRouter.GetInstance();
+        IDMReceiver cbs = dm.GetCallbacks(dm_instance_id);
+
+        Byte[] MsgID = ConvertCVoid(message_id, message_id_len);
+        Byte[] ReactionTo = ConvertCVoid(reaction_to, reaction_to_len);
+        String Nick = ConvertCChar(nickname, nickname_len);
+        String Text = ConvertCChar(text, text_len);
         Byte[] partnerKey = ConvertCVoid(partnerkey, partnerkey_len);
         Byte[] senderKey = ConvertCVoid(senderkey, senderkey_len);
-        String Message = ConvertCChar(text, text_len);
+
         Console.WriteLine("DMReceiveReaction {0}->{1}, {2}: {3}",
             System.Convert.ToBase64String(partnerKey),
-            System.Convert.ToBase64String(senderKey), dmToken, Message);
-        return 0;
+            System.Convert.ToBase64String(senderKey), dmToken, Text);
+
+        return cbs.ReceiveReaction(MsgID, ReactionTo,
+            Nick, Text, partnerKey, senderKey, dmToken, codeset, timestamp,
+            round_id, status);
     }
     /// <summary>
-    /// Dummy implementation of callback
+    /// Pass through implementation for C Library Callback for
+    /// DMUpdateSentStatus
     /// </summary>
     public static long DMUpdateSentStatus(int dm_instance_id,
         long uuid,
         void* message_id, int message_id_len, long timestamp,
         long round_id, long status)
     {
+        DMReceiverRouter dm = DMReceiverRouter.GetInstance();
+        IDMReceiver cbs = dm.GetCallbacks(dm_instance_id);
+
         Byte[] MsgID = ConvertCVoid(message_id, message_id_len);
         Console.WriteLine("DMUpdateSentStatus {0}: {1}",
             System.Convert.ToBase64String(MsgID), status);
-        return 0;
+
+        return cbs.UpdateSentStatus(uuid, MsgID,
+            timestamp, round_id, status);
+    }
+    /// <summary>
+    /// User is blocked callback. Used to tell UI a user is blocked.
+    /// </summary>
+    public static void DMBlockUser(int dm_instance_id,
+        void* pubkey, int pubkey_len)
+    {
+        DMReceiverRouter dm = DMReceiverRouter.GetInstance();
+        IDMReceiver cbs = dm.GetCallbacks(dm_instance_id);
+
+        Byte[] publicKey = ConvertCVoid(pubkey, pubkey_len);
+        Console.WriteLine("DMBlockUser {0}",
+            System.Convert.ToBase64String(publicKey));
+
+        cbs.BlockUser(publicKey);
     }
 
     /// <summary>
-    /// DMReceiverCallbackFunctions holds the callback function pointers
-    /// to the various reception functions for direct messages. You must
-    /// Create this structure and call cmix_dm_set_callbacks before
+    /// User is unblocked callback. Used to tell UI a user is unblocked.
+    /// </summary>
+    public static void DMUnblockUser(int dm_instance_id,
+        void* pubkey, int pubkey_len)
+    {
+        DMReceiverRouter dm = DMReceiverRouter.GetInstance();
+        IDMReceiver cbs = dm.GetCallbacks(dm_instance_id);
+
+        Byte[] publicKey = ConvertCVoid(pubkey, pubkey_len);
+        Console.WriteLine("DMUnblockUser {0}",
+            System.Convert.ToBase64String(publicKey));
+
+        cbs.UnblockUser(publicKey);
+    }
+
+    /// <summary>
+    /// GetConversation callback. Used to retrieve conversation object.
+    /// </summary>
+    public static GoByteSlice DMGetConversation(int dm_instance_id,
+        void* senderkey, int senderkey_len)
+    {
+        DMReceiverRouter dm = DMReceiverRouter.GetInstance();
+        IDMReceiver cbs = dm.GetCallbacks(dm_instance_id);
+
+        Byte[] publicKey = ConvertCVoid(senderkey, senderkey_len);
+        Console.WriteLine("DMGetConversation {0}",
+            System.Convert.ToBase64String(publicKey));
+
+        Byte[] retval = cbs.GetConversation(publicKey);
+
+        return BytesToGoByteSlice(retval);
+    }
+
+    /// <summary>
+    /// GetConversations callback. Used to retrieve all conversation objects.
+    /// </summary>
+    public static GoByteSlice DMGetConversations(int dm_instance_id)
+    {
+        DMReceiverRouter dm = DMReceiverRouter.GetInstance();
+        IDMReceiver cbs = dm.GetCallbacks(dm_instance_id);
+
+        Console.WriteLine("DMGetConversations");
+
+        Byte[] retval = cbs.GetConversations();
+
+        return BytesToGoByteSlice(retval);
+    }
+
+    /// <summary>
+    /// DMReceiverRouterFunctions holds the function pointers
+    /// to the various DMReceiver reception functions for direct messages.
+    /// You must create this structure and call cmix_dm_set_router before
     /// you can receive messages from xx network cMix.
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
-    public class DMReceiverCallbackFunctions
+    public class DMReceiverRouterFunctions
     {
         DMReceiveCallbackFn receiveFn = DMReceive;
         DMReceiveTextCallbackFn receiveTextFn = DMReceiveText;
         DMReceiveReplyCallbackFn receiveReplyFn = DMReceiveReply;
         DMReceiveReactionCallbackFn receiveReactionFn = DMReceiveReaction;
         DMUpdateSentStatusCallbackFn updateSentStatusFn = DMUpdateSentStatus;
+        DMBlockUserCallbackFn blockUserFn = DMBlockUser;
+        DMUnblockUserCallbackFn unblockUserFn = DMUnblockUser;
+        DMGetConversationCallbackFn getConversationFn = DMGetConversation;
+        DMGetConversationsCallbackFn getConversationsFn = DMGetConversations;
     }
 
     /// <summary>
     /// Internal CLIB function mappings. Do not use directly.
     /// </summary>
-    static class CLIB
+    internal static class CLIB
     {
+        private const string xxdkLib = "xxdk";
+
+        static CLIB()
+        {
+            // Setup our custom import resolver to search the runtimes directory
+            NativeLibrary.SetDllImportResolver(typeof(CLIB).Assembly,
+                DllImportResolver);
+        }
+
+        static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+        static readonly bool IsMac = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+        static readonly bool IsLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+
+        static readonly bool isX64 = (RuntimeInformation.ProcessArchitecture == Architecture.X64) ? true : false;
+        static readonly bool isArm64 = (RuntimeInformation.ProcessArchitecture == Architecture.Arm64) ? true : false;
+
+        private static IntPtr DllImportResolver(string libraryName,
+            Assembly assembly, DllImportSearchPath? searchPath)
+        {
+            if (libraryName != xxdkLib)
+            {
+                //Console.Error.WriteLine("Library Name: " + libraryName);
+                return IntPtr.Zero;
+            }
+
+            string myOS;
+            string myLibName = libraryName;
+            if (IsWindows) {
+                myOS = "win";
+                myLibName = myLibName + ".dll";
+            } else if (IsMac) {
+                myOS = "darwin";
+                myLibName = "lib" + myLibName + ".so";
+            }
+            else if (IsLinux) {
+                myOS = "linux";
+                myLibName = "lib" + myLibName + ".so";
+            }
+            else
+            {
+                throw new Exception("unsupported operating system: "
+                    + RuntimeInformation.OSDescription);
+            }
+
+            string myARCH;
+            if (isX64)
+            {
+                myARCH = "x64";
+            }
+            else if (isArm64)
+            {
+                myARCH = "arm64";
+            }
+            else
+            {
+                throw new Exception("unsupported architecture: "
+                    + RuntimeInformation.ProcessArchitecture);
+            }
+
+            string myTarget = myOS + "-" + myARCH;
+            string mySearchPath = Path.Join("runtimes", myTarget, "native");
+
+            object? nativeSearchContexts = AppContext.GetData(
+                "PLATFORM_RESOURCE_ROOTS");
+            var delimiter = RuntimeInformation.IsOSPlatform(
+                OSPlatform.Windows) ? ";" : ":";
+            if (nativeSearchContexts != null)
+            {
+                string nativePaths = (string)nativeSearchContexts;
+                foreach (var directory in nativePaths.Split(delimiter))
+                {
+                    var path = Path.Combine(directory, mySearchPath,
+                        myLibName);
+                    //Console.Error.WriteLine("PATH: " + path);
+                    if (Path.Exists(path))
+                    {
+                        return NativeLibrary.Load(path);
+                    }
+                }
+            }
+
+            // Next, try to load any OS-provided version of the library
+            IntPtr lib;
+            if (NativeLibrary.TryLoad(myLibName, out lib))
+            {
+                return lib;
+            }
+            return NativeLibrary.Load(myLibName, assembly, searchPath);
+        }
+
         // This function sets the cMix DM Receiver callbacks in the library
         // You must call it before starting networking and receiving
         // messages.
-        [DllImport("libxxdk.so")]
-        public static extern void cmix_dm_set_callbacks(
-            DMReceiverCallbackFunctions cbs);
+        [DllImport(xxdkLib)]
+        public static extern void cmix_dm_set_router(
+            DMReceiverRouterFunctions cbs);
 
         // GetVersion returns the xxdk.SEMVER.
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern GoString GetVersion();
 
         // GetGitVersion returns the xxdk.GITVERSION.
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern GoString GetGitVersion();
 
         // GetDependencies returns the xxdk.DEPENDENCIES.
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern GoString GetDependencies();
 
         // NewCmix creates user storage, generates keys, connects, and registers with
@@ -750,7 +1148,7 @@ public unsafe class Network
         // date.
         //
         // Users of this function should delete the storage directory on error.
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern GoError NewCmix(GoString ndfJSON,
             GoString storageDir, GoSlice password,
             GoString registrationCode);
@@ -771,48 +1169,48 @@ public unsafe class Network
         // Creating multiple cMix instance IDs with the same storage Dir will
         // cause data corruption. In most cases only 1 instance should ever be
         // needed.
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern LoadCmix_return LoadCmix(GoString storageDir,
             GoSlice password, GoSlice cmixParamsJSON);
 
 
         // cmix_GetReceptionID returns the current default reception ID
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern cmix_GetReceptionID_return cmix_GetReceptionID(
             GoInt32 cMixInstanceID);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern cmix_EKVGet_return cmix_EKVGet(
             GoInt32 cMixInstanceID, GoString key);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern GoError cmix_EKVSet(GoInt32 cMixInstanceID,
             GoString key, GoSlice value);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern GoError cmix_StartNetworkFollower(
             GoInt32 cMixInstanceID, GoInt timeoutMS);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern GoError cmix_StopNetworkFollower(
             GoInt32 cMixInstanceID);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern GoError cmix_WaitForNetwork(GoInt32 cMixInstanceID,
             GoInt timeoutMS);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern GoUint8 cmix_ReadyToSend(GoInt32 cMixInstanceID);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern GoByteSlice cmix_GenerateCodenameIdentity(
             GoString secretPassphrase);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern cmix_dm_NewDMClient_return cmix_dm_NewDMClient(
             GoInt32 cMixInstanceID, GoSlice codenameIdentity,
             GoString secretPassphrase);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern cmix_dm_GetDMToken_return cmix_dm_GetDMToken(
             GoInt32 dmInstanceID);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern cmix_dm_GetDMPubKey_return cmix_dm_GetDMPubKey(
             GoInt32 dmInstanceID);
-        [DllImport("libxxdk.so")]
+        [DllImport(xxdkLib)]
         public static extern cmix_dm_SendText_return cmix_dm_SendText(
-            GoInt32 dmInstanceID, GoSlice partnerPubKey, GoUint32 dmToken,
+            GoInt32 dmInstanceID, GoSlice partnerPubKey, GoInt32 dmToken,
             GoString message, GoInt64 leaseTimeMS, GoSlice cmixParamsJSON);
 
     }
