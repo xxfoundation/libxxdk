@@ -14,6 +14,15 @@ cd xxdk.NET
 dotnet run --ndf mainnet-ndf.json --state-dir world --wait 20 | grep ^DM
 ```
 
+NOTE: you may need to specify a compiler to the make command, especially
+when cross compiling. Example for compiling to windows:
+```
+CC=x86_64-w64-mingw32-gcc make -k
+cd xxdk.NET
+dotnet run --ndf mainnet-ndf.json --state-dir world --wait 20 | grep ^DM
+```
+
+
 It's highly recommended to run with grep on the output. Especially on
 mainnet, logs can be noisy with failure to connect errors as it accesses
 the network.
