@@ -21,7 +21,7 @@ package main
 // // here because of cgo rules.                                              //
 // /////////////////////////////////////////////////////////////////////////////
 //
-// long cmix_dm_receive(int dm_instance_id,
+// DLL_EXPORT long cmix_dm_receive(int dm_instance_id,
 //    void* message_id, int message_id_len,
 //    char* nickname, int nickname_len,
 //    void* text, int text_len,
@@ -34,7 +34,7 @@ package main
 //       text, text_len, partnerkey, partnerkey_len, senderkey, senderkey_len,
 //       dmToken, codeset, timestamp, round_id, msg_type, status);
 // }
-// long cmix_dm_receive_text(int dm_instance_id,
+// DLL_EXPORT long cmix_dm_receive_text(int dm_instance_id,
 //    void* message_id, int message_id_len,
 //    char* nickname, int nickname_len,
 //    char* text, int text_len,
@@ -47,7 +47,7 @@ package main
 //       text, text_len, partnerkey, partnerkey_len, senderkey, senderkey_len,
 //       dmToken, codeset, timestamp, round_id, status);
 // }
-// long cmix_dm_receive_reply(int dm_instance_id,
+// DLL_EXPORT long cmix_dm_receive_reply(int dm_instance_id,
 //    void* message_id, int message_id_len,
 //    void* reply_to, int reply_to_len,
 //    char* nickname, int nickname_len,
@@ -62,7 +62,7 @@ package main
 //       text, text_len, partnerkey, partnerkey_len, senderkey, senderkey_len,
 //       dmToken, codeset, timestamp, round_id, status);
 // }
-// long cmix_dm_receive_reaction(int dm_instance_id,
+// DLL_EXPORT long cmix_dm_receive_reaction(int dm_instance_id,
 //    void* message_id, int message_id_len,
 //    void* reaction_to, int reaction_to_len,
 //    char* nickname, int nickname_len,
@@ -77,17 +77,17 @@ package main
 //       text, text_len, partnerkey, partnerkey_len, senderkey, senderkey_len,
 //       dmToken, codeset, timestamp, round_id, status);
 // }
-// void cmix_dm_update_sent_status(int dm_instance_id,
+// DLL_EXPORT void cmix_dm_update_sent_status(int dm_instance_id,
 //    long uuid,
 //    void* message_id, int message_id_len, long timestamp,
 //    long round_id, long status) {
 //    DMReceiverRouter.updateSentStatusFn(dm_instance_id, uuid,
 //        message_id, message_id_len, timestamp, round_id, status);
 // }
-// void cmix_dm_block_sender(int dm_instance_id, void* pubkey, int pubkey_len) {
+// DLL_EXPORT void cmix_dm_block_sender(int dm_instance_id, void* pubkey, int pubkey_len) {
 //    DMReceiverRouter.blockSenderFn(dm_instance_id, pubkey, pubkey_len);
 // }
-// void cmix_dm_unblock_sender(int dm_instance_id, void* pubkey,
+// DLL_EXPORT void cmix_dm_unblock_sender(int dm_instance_id, void* pubkey,
 //    int pubkey_len) {
 //    DMReceiverRouter.unblockSenderFn(dm_instance_id, pubkey, pubkey_len);
 // }
@@ -99,7 +99,7 @@ package main
 // GoByteSlice cmix_dm_get_conversations(int dm_instance_id) {
 //    return DMReceiverRouter.getConversationsFn(dm_instance_id);
 // }
-// extern void cmix_dm_set_router(DMReceiverRouterFunctions cbs) {
+// DLL_EXPORT void cmix_dm_set_router(DMReceiverRouterFunctions cbs) {
 //     DMReceiverRouter.receiveFn = cbs.receiveFn;
 //     DMReceiverRouter.receiveTextFn = cbs.receiveTextFn;
 //     DMReceiverRouter.receiveReplyFn = cbs.receiveReplyFn;

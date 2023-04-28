@@ -9,10 +9,29 @@ x86_64). It should run on Windows but may need the library name
 changed.
 
 ```
-make -k
+make linux-x64
 cd xxdk.NET
 dotnet run --ndf mainnet-ndf.json --state-dir world --wait 20 | grep ^DM
 ```
+
+Usually, you will want to make the library only for your
+architecture. The options are:
+
+* windows-x64
+* windows-arm64
+* linux-x64
+* linux-arm64
+* darwin-x64
+* darwin-arm64
+
+NOTE: you may need to specify a compiler to the make command, especially
+when cross compiling. Example for compiling to windows:
+```
+CC=x86_64-w64-mingw32-gcc make windows-x64
+cd xxdk.NET
+dotnet run --ndf mainnet-ndf.json --state-dir world --wait 20 | grep ^DM
+```
+
 
 It's highly recommended to run with grep on the output. Especially on
 mainnet, logs can be noisy with failure to connect errors as it accesses

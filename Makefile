@@ -1,6 +1,6 @@
 DOTNET = xxdk.NET
 
-.PHONY: all windows-x64 windows-arm64 linux-arm64 linux-arm64 darwin-x64 darwin-arm64 dotnet
+.PHONY: all windows-x64 windows-arm64 linux-x64 linux-arm64 darwin-x64 darwin-arm64 dotnet
 
 libxxdk-win-x64.dll:
 	CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build -buildmode=c-shared -o $@ ./sharedcgo
