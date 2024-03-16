@@ -62,6 +62,10 @@ package main
 // extern GoByteSlice cmix_dm_get_conversation(int dm_instance_id,
 //    void* senderkey, int senderkey_len);
 // extern GoByteSlice cmix_dm_get_conversations(int dm_instance_id);
+// extern int cmix_dm_delete_message(void* message_id, int message_id_len,
+//    void* pubkey, int pubkey_len);
+// extern int cmix_dm_event_update(long event_type, void* json_data,
+//    int json_data_len);
 // extern void cmix_dm_set_router(DMReceiverRouterFunctions cbs);
 import "C"
 
@@ -286,8 +290,11 @@ func cmix_dm_NewDMClient(cMixInstanceID int32, codenameIdentity []byte,
 	}
 	myReceiver := &dmReceiver{}
 	receiver := bindings.NewDMReceiver(myReceiver)
-	dmClient, err := bindings.NewDMClientWithGoEventModel(int(cMixInstanceID),
-		pi.Marshal(), receiver)
+	notifications, _ := bindings.LoadNotificationsDummy(int(cMixInstanceID))
+	notificationsID := notifications.GetID()
+	dmClient, err := bindings.NewDMClientWithGoEventModel(
+		int(cMixInstanceID), notificationsID,
+		pi.Marshal(), receiver, myReceiver)
 	if err != nil {
 		return -1, makeError(err)
 	}
@@ -472,4 +479,19 @@ func (dmr *dmReceiver) GetConversations() []byte {
 	return res
 }
 
+func (dmr *dmReceiver) DeleteMessage(messageID, senderPubKey []byte) bool {
+	res := int(C.cmix_dm_delete_message(
+		C.CBytes(messageID), C.int(len(messageID)),
+		C.CBytes(senderPubKey), C.int(len(senderPubKey))))
+	if res == 0 {
+		return false
+	} else {
+		return true
+	}
+}
+
+func (dmr *dmReceiver) EventUpdate(eventType int64, jsonData []byte) {
+	C.cmix_dm_event_update(C.long(eventType),
+		C.CBytes(jsonData), C.int(len(jsonData)))
+}
 func main() {}

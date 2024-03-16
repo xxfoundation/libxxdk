@@ -84,20 +84,30 @@ package main
 //    DMReceiverRouter.updateSentStatusFn(dm_instance_id, uuid,
 //        message_id, message_id_len, timestamp, round_id, status);
 // }
-// DLL_EXPORT void cmix_dm_block_sender(int dm_instance_id, void* pubkey, int pubkey_len) {
+// DLL_EXPORT void cmix_dm_block_sender(int dm_instance_id, void* pubkey,
+//    int pubkey_len) {
 //    DMReceiverRouter.blockSenderFn(dm_instance_id, pubkey, pubkey_len);
 // }
 // DLL_EXPORT void cmix_dm_unblock_sender(int dm_instance_id, void* pubkey,
 //    int pubkey_len) {
 //    DMReceiverRouter.unblockSenderFn(dm_instance_id, pubkey, pubkey_len);
 // }
-// GoByteSlice cmix_dm_get_conversation(int dm_instance_id, void* senderkey,
-//    int senderkey_len) {
+// DLL_EXPORT GoByteSlice cmix_dm_get_conversation(int dm_instance_id,
+//    void* senderkey, int senderkey_len) {
 //    return DMReceiverRouter.getConversationFn(dm_instance_id, senderkey,
 //      senderkey_len);
 // }
-// GoByteSlice cmix_dm_get_conversations(int dm_instance_id) {
+// DLL_EXPORT GoByteSlice cmix_dm_get_conversations(int dm_instance_id) {
 //    return DMReceiverRouter.getConversationsFn(dm_instance_id);
+// }
+// DLL_EXPORT int cmix_dm_delete_message(void* message_id, int message_id_len,
+//    void* pubkey, int pubkey_len) {
+//    return DMReceiverRouter.deleteMessageFn(message_id, message_id_len,
+//        pubkey, pubkey_len);
+// }
+// DLL_EXPORT void cmix_dm_event_update(long event_type, void* json_data,
+//    int json_data_len) {
+//    DMReceiverRouter.eventUpdateFn(event_type, json_data, json_data_len);
 // }
 // DLL_EXPORT void cmix_dm_set_router(DMReceiverRouterFunctions cbs) {
 //     DMReceiverRouter.receiveFn = cbs.receiveFn;
@@ -109,5 +119,7 @@ package main
 //     DMReceiverRouter.unblockSenderFn = cbs.unblockSenderFn;
 //     DMReceiverRouter.getConversationFn = cbs.getConversationFn;
 //     DMReceiverRouter.getConversationsFn = cbs.getConversationsFn;
+//     DMReceiverRouter.deleteMessageFn = cbs.deleteMessageFn;
+//     DMReceiverRouter.eventUpdateFn = cbs.eventUpdateFn;
 // }
 import "C"
