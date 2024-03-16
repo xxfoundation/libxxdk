@@ -452,6 +452,16 @@ public unsafe class Network
         /// GetConversations callback. Used to retrieve all conversation objects.
         /// </summary>
         Byte[] GetConversations();
+
+        /// <summary>
+        /// DeleteMessage callback. Used to signal a delete request.
+        /// </summary>
+        bool DeleteMessage(Byte[] MessageID, Byte[] pubkey);
+
+        /// <summary>
+        /// EventUpdate callback. Used to signal an event
+        /// </summary>
+        void EventUpdate(Int64 eventType, Byte[] jsonData);
     }
 
     /// <summary>
@@ -801,6 +811,20 @@ public unsafe class Network
         int dm_instance_id);
 
     /// <summary>
+    /// DeleteMessage callback Used to signal a delete message request
+    /// </summary>
+    public delegate int DMDeleteMessageCallbackFn(int dm_instance_id,
+        void* message_id, int message_id_len,
+        void* pubkey, int pubkey_len);
+
+    /// <summary>
+    /// DMEventupdate callback for events
+    /// </summary>
+    public delegate void DMEventUpdateCallbackFn(int dm_instance_id,
+        long event_type, void* json_data,
+        int json_data_len);
+
+    /// <summary>
     /// Pass through implementation for C Library Callback for
     /// DMReceive
     /// </summary>
@@ -1009,6 +1033,51 @@ public unsafe class Network
     }
 
     /// <summary>
+    /// DeleteMessage callback Used to signal a delete message request
+    /// </summary>
+    public static int DMDeleteMessage(int dm_instance_id,
+        void* message_id, int message_id_len, void* pubkey, int pubkey_len)
+    {
+        DMReceiverRouter dm = DMReceiverRouter.GetInstance();
+        IDMReceiver cbs = dm.GetCallbacks(dm_instance_id);
+
+        Console.WriteLine("DMDeleteMessage");
+
+        Byte[] messageID = ConvertCVoid(message_id, message_id_len);
+        Console.WriteLine("DMDeleteMessage messageID {0}",
+            System.Convert.ToBase64String(messageID));
+        Byte[] publicKey = ConvertCVoid(pubkey, pubkey_len);
+        Console.WriteLine("DMDeleteMessage pubkey {0}",
+            System.Convert.ToBase64String(publicKey));
+
+
+        if (cbs.DeleteMessage(messageID, publicKey))
+        {
+            return 1;
+        }
+        return 0;
+    }
+
+    /// <summary>
+    /// DMEventupdate callback for events
+    /// </summary>
+    public static void DMEventUpdate(int dm_instance_id, long event_type,
+        void* json_data, int json_data_len)
+    {
+        DMReceiverRouter dm = DMReceiverRouter.GetInstance();
+        IDMReceiver cbs = dm.GetCallbacks(dm_instance_id);
+
+        Console.WriteLine("DMEventUpdate");
+
+        Byte[] jsonData = ConvertCVoid(json_data, json_data_len);
+        Console.WriteLine("DMDeleteMessage json_data {0}",
+            System.Convert.ToBase64String(jsonData));
+
+        cbs.EventUpdate(event_type, jsonData);
+    }
+
+
+    /// <summary>
     /// DMReceiverRouterFunctions holds the function pointers
     /// to the various DMReceiver reception functions for direct messages.
     /// You must create this structure and call cmix_dm_set_router before
@@ -1026,6 +1095,8 @@ public unsafe class Network
         DMUnblockUserCallbackFn unblockUserFn = DMUnblockUser;
         DMGetConversationCallbackFn getConversationFn = DMGetConversation;
         DMGetConversationsCallbackFn getConversationsFn = DMGetConversations;
+        DMDeleteMessageCallbackFn deleteMessageFn = DMDeleteMessage;
+        DMEventUpdateCallbackFn eventUpdatefn = DMEventUpdate;
     }
 
     /// <summary>

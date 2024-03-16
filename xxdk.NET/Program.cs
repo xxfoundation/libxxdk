@@ -269,5 +269,15 @@ public class Program
             Byte[] conv = Array.Empty<byte>();
             return conv;
         }
+
+        public bool DeleteMessage(byte[] messageID, byte[] pubkey)
+        {
+            return false;
+        }
+
+        public void EventUpdate(Int64 eventType, byte[] jsonData)
+        {
+            Console.WriteLine("Event Update: " + jsonData);
+        }
     }
 }
