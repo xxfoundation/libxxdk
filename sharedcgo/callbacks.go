@@ -100,14 +100,18 @@ package main
 // DLL_EXPORT GoByteSlice cmix_dm_get_conversations(int dm_instance_id) {
 //    return DMReceiverRouter.getConversationsFn(dm_instance_id);
 // }
-// DLL_EXPORT int cmix_dm_delete_message(void* message_id, int message_id_len,
+// DLL_EXPORT int cmix_dm_delete_message(int dm_instance_id,
+//    void* message_id, int message_id_len,
 //    void* pubkey, int pubkey_len) {
-//    return DMReceiverRouter.deleteMessageFn(message_id, message_id_len,
+//    return DMReceiverRouter.deleteMessageFn(dm_instance_id,
+//        message_id, message_id_len,
 //        pubkey, pubkey_len);
 // }
-// DLL_EXPORT void cmix_dm_event_update(long event_type, void* json_data,
+// DLL_EXPORT void cmix_dm_event_update(int dm_instance_id,
+//    long event_type, void* json_data,
 //    int json_data_len) {
-//    DMReceiverRouter.eventUpdateFn(event_type, json_data, json_data_len);
+//    DMReceiverRouter.eventUpdateFn(dm_instance_id, event_type,
+//        json_data, json_data_len);
 // }
 // DLL_EXPORT void cmix_dm_set_router(DMReceiverRouterFunctions cbs) {
 //     DMReceiverRouter.receiveFn = cbs.receiveFn;
