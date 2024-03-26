@@ -57,9 +57,11 @@ typedef void (* cmix_dm_unblock_sender_fn)(int dm_instance_id,
 typedef GoByteSlice (* cmix_dm_get_conversation_fn)(int dm_instance_id,
   void* senderkey, int senderkey_len);
 typedef GoByteSlice (* cmix_dm_get_conversations_fn)(int dm_instance_id);
-typedef int (* cmix_dm_delete_message_fn)(void* message_id, int message_id_len,
+typedef int (* cmix_dm_delete_message_fn)(int dm_instance_id,
+  void* message_id, int message_id_len,
   void* pubkey, int pubkey_len);
-typedef void (* cmix_dm_event_update_fn)(long event_type, void* json_data,
+typedef void (* cmix_dm_event_update_fn)(int dm_instance_id,
+  long event_type, void* json_data,
   int json_data_len);
 
 // This struct values must be set by your program, the symbol is called
