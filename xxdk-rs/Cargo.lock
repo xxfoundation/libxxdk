@@ -367,6 +367,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32b752e52a2da0ddfbdbcc6fceadfeede4c939ed16d13e648833a61dfb611ed8"
 
 [[package]]
+name = "xxdk"
+version = "0.1.0"
+dependencies = [
+ "lazy_static",
+ "libc",
+ "xxdk-sys",
+]
+
+[[package]]
 name = "xxdk-sys"
 version = "0.1.0"
 dependencies = [
