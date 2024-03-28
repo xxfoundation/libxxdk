@@ -21,4 +21,12 @@ fn main() {
     bindings
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings");
+
+    println!("cargo:rustc-link-search=native={}", "./target");
+    println!("cargo:rustc-link-lib=static={}", "xxdk");
+    println!("cargo:rustc-flags=-lresolv");
+    #[cfg(target_os = "macos")]
+    {
+        println!("cargo:rustc-flags=-l framework=CoreFoundation -l framework=Security");
+    }
 }
