@@ -8,12 +8,6 @@ use xxdk_sys::*;
 
 pub mod callbacks;
 
-// Safety for get_dependencies, get_version, and get_git_version:
-//
-// - These functions return static global Go strings that are never garbage collected.
-// - The returned strings are defined as string literals in the Go source, and so are guaranteed to
-//   be valid UTF-8.
-
 /// Get the dependencies string of the XXDK library.
 pub fn get_dependencies() -> &'static str {
     unsafe { static_go_string_as_str(GetDependencies()) }
@@ -29,100 +23,167 @@ pub fn get_git_version() -> &'static str {
     unsafe { static_go_string_as_str(GetGitVersion()) }
 }
 
-/// Create a user storage, generate keys, and register with the network.
-///
-/// Note that this does not register a username/identity, simply a cryptographic identity allowing
-/// the registration of such data at a later time.
-///
-/// Users of this function should remove the storage directory on error.
-pub fn new_cmix(
-    ndf_json: &str,
-    storage_dir: &str,
-    password: &[u8],
-    registration_code: &str,
-) -> Result<(), String> {
-    unsafe {
-        let err = NewCmix(
-            str_as_go_string(ndf_json),
-            str_as_go_string(storage_dir),
-            bytes_as_go_slice(password),
-            str_as_go_string(registration_code),
-        );
-        go_error_into_result(|| (), err)
-    }
-}
-
-/// Load an existing user storage.
-///
-/// Returns a cMix instance ID.
-///
-/// Note that loading more than one cMix instance with the same storage directory will result in
-/// data corruption.
-///
-/// This function is non-blocking, and spawns subprocesses to handle network operations.
-///
-/// # Errors
-///
-/// Fails with an error if no user storage exists at the given file path, or if the given password
-/// is incorrect.
-pub fn load_cmix(storage_dir: &str, password: &[u8], params_json: &[u8]) -> Result<i32, String> {
-    unsafe {
-        let LoadCmix_return { r0, r1 } = LoadCmix(
-            str_as_go_string(storage_dir),
-            bytes_as_go_slice(password),
-            bytes_as_go_slice(params_json),
-        );
-        go_error_into_result(|| r0, r1)
-    }
-}
-
 pub mod cmix {
+    use std::sync::Arc;
+
+    use super::callbacks::DmCallbacks;
     use super::*;
 
-    /// Get the current default reception ID for the given cMix instance.
-    pub fn get_reception_id(cmix_instance: i32) -> Result<Vec<u8>, String> {
-        unsafe {
-            let cmix_GetReceptionID_return { r0, r1 } = cmix_GetReceptionID(cmix_instance);
-            go_error_into_result(|| c_byte_slice_into_vec(r0), r1)
+    /// A cMix instance.
+    #[derive(Debug)]
+    pub struct CMix {
+        pub(crate) cmix_instance: i32,
+    }
+
+    impl CMix {
+        /// Create a user storage, generate keys, and register with the network.
+        ///
+        /// Note that this does not register a username/identity, simply a cryptographic identity allowing
+        /// the registration of such data at a later time.
+        ///
+        /// Users of this function should remove the storage directory on error.
+        pub fn create(
+            ndf_json: &str,
+            storage_dir: &str,
+            password: &[u8],
+            registration_code: &str,
+        ) -> Result<(), String> {
+            // Need to clone this here, as mutable, since the password gets zeroed out on the Go
+            // side.
+            #[allow(unused_mut)]
+            let mut password = Vec::from(password);
+            unsafe {
+                let err = NewCmix(
+                    str_as_go_string(ndf_json),
+                    str_as_go_string(storage_dir),
+                    bytes_as_go_slice(&password),
+                    str_as_go_string(registration_code),
+                );
+                go_error_into_result(|| (), err)
+            }
         }
-    }
 
-    /// Get the value of a key in the KV store for the given cMix instance.
-    pub fn ekv_get(cmix_instance: i32, key: &str) -> Result<Vec<u8>, String> {
-        unsafe {
-            let cmix_EKVGet_return { r0, r1 } = cmix_EKVGet(cmix_instance, str_as_go_string(key));
-            go_error_into_result(|| c_byte_slice_into_vec(r0), r1)
+        /// Load an existing user storage.
+        ///
+        /// Note that loading more than one cMix instance with the same storage directory will result in
+        /// data corruption.
+        ///
+        /// This function is non-blocking, and spawns subprocesses to handle network operations.
+        ///
+        /// # Errors
+        ///
+        /// Fails with an error if no user storage exists at the given file path, or if the given password
+        /// is incorrect.
+        pub fn load(
+            storage_dir: &str,
+            password: &[u8],
+            params_json: &[u8],
+        ) -> Result<Self, String> {
+            unsafe {
+                let LoadCmix_return { r0, r1 } = LoadCmix(
+                    str_as_go_string(storage_dir),
+                    bytes_as_go_slice(password),
+                    bytes_as_go_slice(params_json),
+                );
+                go_error_into_result(|| CMix { cmix_instance: r0 }, r1)
+            }
         }
-    }
 
-    /// Set the value of a key in the KV store for the given cMix instance.
-    pub fn ekv_set(cmix_instance: i32, key: &str, value: &[u8]) -> Result<(), String> {
-        unsafe {
-            go_error_into_result(
-                || (),
-                cmix_EKVSet(
-                    cmix_instance,
-                    str_as_go_string(key),
-                    bytes_as_go_slice(value),
-                ),
-            )
+        /// Load a user storage, generate keys, and register with the network.
+        ///
+        /// This creates the storage directory, generates keys, registers with the network, and
+        /// loads the resulting cMix instance.
+        ///
+        /// If creation of the user storage fails, this will make an attempt to remove the created
+        /// directory before returning an error.
+        pub fn create_and_load(
+            ndf_json: &str,
+            storage_dir: &str,
+            password: &[u8],
+            registration_code: &str,
+            params_json: &[u8],
+        ) -> Result<Self, String> {
+            if let Err(err) = Self::create(ndf_json, storage_dir, password, registration_code) {
+                std::fs::remove_dir_all(storage_dir).ok();
+                Err(err)
+            } else {
+                Self::load(storage_dir, password, params_json)
+            }
         }
-    }
 
-    pub fn start_network_follower(cmix_instance: i32, timeout_ms: i64) -> Result<(), String> {
-        unsafe { go_error_into_result(|| (), cmix_StartNetworkFollower(cmix_instance, timeout_ms)) }
-    }
+        /// Get the current default reception ID for this cMix instance.
+        pub fn reception_id(&self) -> Result<Vec<u8>, String> {
+            unsafe {
+                let cmix_GetReceptionID_return { r0, r1 } = cmix_GetReceptionID(self.cmix_instance);
+                go_error_into_result(|| c_byte_slice_into_vec(r0), r1)
+            }
+        }
 
-    pub fn stop_network_follower(cmix_instance: i32) -> Result<(), String> {
-        unsafe { go_error_into_result(|| (), cmix_StopNetworkFollower(cmix_instance)) }
-    }
+        /// Get the value of a key in the KV store for this cMix instance.
+        pub fn ekv_get(&self, key: &str) -> Result<Vec<u8>, String> {
+            unsafe {
+                let cmix_EKVGet_return { r0, r1 } =
+                    cmix_EKVGet(self.cmix_instance, str_as_go_string(key));
+                go_error_into_result(|| c_byte_slice_into_vec(r0), r1)
+            }
+        }
 
-    pub fn wait_for_network(cmix_instance: i32, timeout_ms: i64) -> Result<(), String> {
-        unsafe { go_error_into_result(|| (), cmix_WaitForNetwork(cmix_instance, timeout_ms)) }
-    }
+        /// Set the value of a key in the KV store for this cMix instance.
+        pub fn ekv_set(&self, key: &str, value: &[u8]) -> Result<(), String> {
+            unsafe {
+                go_error_into_result(
+                    || (),
+                    cmix_EKVSet(
+                        self.cmix_instance,
+                        str_as_go_string(key),
+                        bytes_as_go_slice(value),
+                    ),
+                )
+            }
+        }
 
-    pub fn ready_to_send(cmix_instance: i32) -> bool {
-        unsafe { cmix_ReadyToSend(cmix_instance) != 0 }
+        pub fn start_network_follower(&self, timeout_ms: i64) -> Result<(), String> {
+            unsafe {
+                go_error_into_result(
+                    || (),
+                    cmix_StartNetworkFollower(self.cmix_instance, timeout_ms),
+                )
+            }
+        }
+
+        pub fn stop_network_follower(&self) -> Result<(), String> {
+            unsafe { go_error_into_result(|| (), cmix_StopNetworkFollower(self.cmix_instance)) }
+        }
+
+        pub fn wait_for_network(&self, timeout_ms: i64) -> Result<(), String> {
+            unsafe {
+                go_error_into_result(|| (), cmix_WaitForNetwork(self.cmix_instance, timeout_ms))
+            }
+        }
+
+        pub fn ready_to_send(&self) -> bool {
+            unsafe { cmix_ReadyToSend(self.cmix_instance) != 0 }
+        }
+
+        pub fn new_dm_client(
+            &self,
+            codename_identity: &[u8],
+            passphrase: &str,
+            callbacks: Arc<dyn DmCallbacks>,
+        ) -> Result<Dm, String> {
+            let instance_id = unsafe {
+                let cmix_dm_NewDMClient_return { r0, r1 } = cmix_dm_NewDMClient(
+                    self.cmix_instance,
+                    bytes_as_go_slice(codename_identity),
+                    str_as_go_string(passphrase),
+                );
+                go_error_into_result(|| r0, r1)?
+            };
+
+            let dm = Dm { instance_id };
+            dm.set_callbacks(callbacks);
+            Ok(dm)
+        }
     }
 
     pub fn generate_codename_identity(passphrase: &str) -> Vec<u8> {
@@ -133,40 +194,28 @@ pub mod cmix {
         }
     }
 
-    pub mod dm {
-        use super::*;
+    #[derive(Debug)]
+    pub struct Dm {
+        pub(crate) instance_id: i32,
+    }
 
-        pub fn new_dm_client(
-            cmix_instance: i32,
-            codename_identity: &[u8],
-            passphrase: &str,
-        ) -> Result<i32, String> {
+    impl Dm {
+        pub fn get_token(&self) -> Result<i32, String> {
             unsafe {
-                let cmix_dm_NewDMClient_return { r0, r1 } = cmix_dm_NewDMClient(
-                    cmix_instance,
-                    bytes_as_go_slice(codename_identity),
-                    str_as_go_string(passphrase),
-                );
+                let cmix_dm_GetDMToken_return { r0, r1 } = cmix_dm_GetDMToken(self.instance_id);
                 go_error_into_result(|| r0, r1)
             }
         }
 
-        pub fn get_dm_token(dm_instance: i32) -> Result<i32, String> {
+        pub fn get_dm_pubkey(&self) -> Result<Vec<u8>, String> {
             unsafe {
-                let cmix_dm_GetDMToken_return { r0, r1 } = cmix_dm_GetDMToken(dm_instance);
-                go_error_into_result(|| r0, r1)
-            }
-        }
-
-        pub fn get_dm_pubkey(dm_instance: i32) -> Result<Vec<u8>, String> {
-            unsafe {
-                let cmix_dm_GetDMPubKey_return { r0, r1 } = cmix_dm_GetDMPubKey(dm_instance);
+                let cmix_dm_GetDMPubKey_return { r0, r1 } = cmix_dm_GetDMPubKey(self.instance_id);
                 go_error_into_result(|| c_byte_slice_into_vec(r0), r1)
             }
         }
 
         pub fn send(
-            dm_instance: i32,
+            &self,
             partner_pubkey: &[u8],
             dm_token: i32,
             message_type: i64,
@@ -176,7 +225,7 @@ pub mod cmix {
         ) -> Result<Vec<u8>, String> {
             unsafe {
                 let cmix_dm_Send_return { r0, r1 } = cmix_dm_Send(
-                    dm_instance,
+                    self.instance_id,
                     bytes_as_go_slice(partner_pubkey),
                     dm_token,
                     message_type,
@@ -189,7 +238,7 @@ pub mod cmix {
         }
 
         pub fn send_text(
-            dm_instance: i32,
+            &self,
             partner_pubkey: &[u8],
             dm_token: i32,
             message: &str,
@@ -198,7 +247,7 @@ pub mod cmix {
         ) -> Result<Vec<u8>, String> {
             unsafe {
                 let cmix_dm_SendText_return { r0, r1 } = cmix_dm_SendText(
-                    dm_instance,
+                    self.instance_id,
                     bytes_as_go_slice(partner_pubkey),
                     dm_token,
                     str_as_go_string(message),
@@ -210,7 +259,7 @@ pub mod cmix {
         }
 
         pub fn send_reply(
-            dm_instance: i32,
+            &self,
             partner_pubkey: &[u8],
             dm_token: i32,
             message: &str,
@@ -220,7 +269,7 @@ pub mod cmix {
         ) -> Result<Vec<u8>, String> {
             unsafe {
                 let cmix_dm_SendReply_return { r0, r1 } = cmix_dm_SendReply(
-                    dm_instance,
+                    self.instance_id,
                     bytes_as_go_slice(partner_pubkey),
                     dm_token,
                     str_as_go_string(message),
@@ -233,7 +282,7 @@ pub mod cmix {
         }
 
         pub fn send_reaction(
-            dm_instance: i32,
+            &self,
             partner_pubkey: &[u8],
             dm_token: i32,
             message: &str,
@@ -243,7 +292,7 @@ pub mod cmix {
         ) -> Result<Vec<u8>, String> {
             unsafe {
                 let cmix_dm_SendReaction_return { r0, r1 } = cmix_dm_SendReaction(
-                    dm_instance,
+                    self.instance_id,
                     bytes_as_go_slice(partner_pubkey),
                     dm_token,
                     str_as_go_string(message),
