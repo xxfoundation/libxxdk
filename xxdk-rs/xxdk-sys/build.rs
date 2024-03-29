@@ -6,7 +6,7 @@ fn main() {
 
     cgo::Build::new()
         .package("../../sharedcgo")
-        .build_mode(cgo::BuildMode::CShared)
+        .build_mode(cgo::BuildMode::CArchive)
         .build("xxdk");
 
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
