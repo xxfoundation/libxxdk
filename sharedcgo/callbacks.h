@@ -12,6 +12,14 @@ typedef struct {
      void* data;
 } GoByteSlice;
 
+typedef struct {
+  int   IsError;
+  char* Msg;
+  int   MsgLen;
+} GoError;
+
+
+
 typedef long (* cmix_dm_receive_fn)(int dm_instance_id,
   void* message_id, int message_id_len,
   char* nickname, int nickname_len,
@@ -64,6 +72,7 @@ typedef void (* cmix_dm_event_update_fn)(int dm_instance_id,
   long event_type, void* json_data,
   int json_data_len);
 
+
 // This struct values must be set by your program, the symbol is called
 // "DMReceiverRouter"
 typedef struct {
@@ -79,6 +88,21 @@ typedef struct {
   cmix_dm_delete_message_fn deleteMessageFn;
   cmix_dm_event_update_fn eventUpdateFn;
 } DMReceiverRouterFunctions;
+
+
+// Channels Callbacks
+typedef int (* cmix_channels_get_id_fn)(int channels_instance_id);
+typedef GoByteSlice (* cmix_channels_generate_channel_identity_fn)(int channels_instance_id, int cmix_id, GoError* err);
+  
+
+// This struct values must be set by your program, the symbol is called ChannelsRouter
+typedef struct{
+  cmix_channels_get_id_fn getIdFn;
+  cmix_channels_generate_channel_identity_fn generateChannelIdentityFn;
+
+} ChannelsRouterFunctions;
+
+
 
 #ifdef _WIN32
 #define DLL_EXPORT __declspec(dllexport)

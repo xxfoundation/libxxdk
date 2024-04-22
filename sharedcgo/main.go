@@ -13,8 +13,8 @@ package main
 // typedef struct {
 //	int   IsError;
 //	char* Msg;
-//      int   MsgLen;
-// } GoError;
+//  int   MsgLen;
+// } GoErrors;
 //
 // // below are the callbacks defined in callbacks.go
 // extern long cmix_dm_receive(int dm_instance_id,
@@ -69,6 +69,10 @@ package main
 //    long event_type, void* json_data,
 //    int json_data_len);
 // extern void cmix_dm_set_router(DMReceiverRouterFunctions cbs);
+//
+// extern int cmix_channels_get_id(int channels_instance_id);
+// extern GoByteSlice cmix_channels_generate_channel_identity(int channels_instance_id, int cmix_id, GoError* err);
+// extern void cmix_channels_set_router(ChannelsRouterFunctions cbs);
 import "C"
 
 import (
@@ -78,6 +82,7 @@ import (
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/client/v4/bindings"
+	"gitlab.com/elixxir/client/v4/channels"
 	"gitlab.com/elixxir/crypto/codename"
 	"gitlab.com/elixxir/crypto/fastRNG"
 	"gitlab.com/xx_network/crypto/csprng"
@@ -496,4 +501,28 @@ func (dmr *dmReceiver) EventUpdate(eventType int64, jsonData []byte) {
 	C.cmix_dm_event_update(C.int(dmr.dmClientID), C.long(eventType),
 		C.CBytes(jsonData), C.int(len(jsonData)))
 }
+
+// this implements the bindings.Channels
+type ChannelsManager struct {
+	api channels.Manager
+	id  int
+}
+
+func (cm *ChannelsManager) GetId() int {
+	res := C.cmix_channels_get_id(C.int(cm.id))
+	return int(res)
+}
+
+func (cm *ChannelsManager) GenerateChannelIdentity(cmixId int) (bytes []byte, err C.GoError) {
+	data2Copy := C.cmix_channels_generate_channel_identity(C.int(cm.id), C.int(cmixId), &err)
+	if err.IsError != 0 {
+		return []byte{}, C.GoError{IsError: C.int(1), Msg: C.CString("An error occured")}
+	}
+	res := make([]byte, data2Copy.len)
+	buf := *(*[]byte)(data2Copy.data)
+	len := data2Copy.len
+	copy(res, buf[0:len])
+	return res, C.GoError{IsError: C.int(0), Msg: C.CString("")}
+}
+
 func main() {}

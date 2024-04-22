@@ -11,6 +11,7 @@ package main
 // #cgo CFLAGS: -I .
 //
 // DMReceiverRouterFunctions DMReceiverRouter;
+// ChannelsRouterFunctions ChannelsRouter;
 //
 // /////////////////////////////////////////////////////////////////////////////
 // //                                                                         //
@@ -126,4 +127,28 @@ package main
 //     DMReceiverRouter.deleteMessageFn = cbs.deleteMessageFn;
 //     DMReceiverRouter.eventUpdateFn = cbs.eventUpdateFn;
 // }
+
+// /////////////////////////////////////////////////////////////////////////////
+// //                                                                         //
+// // Channels Go Callbacks                                                   //
+// //                                                                         //
+// // These are are called by go to call the functions defined in the         //
+// // ChannelsRouter struct in the callbacks.h file. Do not modify.           //
+// // They have to be defined                                                 //
+// // here because of cgo rules.                                              //
+// /////////////////////////////////////////////////////////////////////////////
+
+// DLL_EXPORT int cmix_channels_get_id(int channels_instance_id) {
+// 	 return ChannelsRouter.getIdFn(channels_instance_id);
+// }
+
+// DLL_EXPORT GoByteSlice cmix_channels_generate_channel_identity(int channels_instance_id, int cmix_id, GoError* err) {
+// 	 return ChannelsRouter.generateChannelIdentityFn(channels_instance_id, cmix_id, err);
+// }
+
+// DLL_EXPORT void cmix_channels_set_router(ChannelsRouterFunctions cbs) {
+// 	ChannelsRouter.getIdFn = cbs.getIdFn;
+//  ChannelsRouter.generateChannelIdentityFn = cbs.generateChannelIdentityFn;
+// }
+
 import "C"
