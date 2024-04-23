@@ -127,7 +127,7 @@ package main
 //     DMReceiverRouter.deleteMessageFn = cbs.deleteMessageFn;
 //     DMReceiverRouter.eventUpdateFn = cbs.eventUpdateFn;
 // }
-
+//
 // /////////////////////////////////////////////////////////////////////////////
 // //                                                                         //
 // // Channels Go Callbacks                                                   //
@@ -137,18 +137,29 @@ package main
 // // They have to be defined                                                 //
 // // here because of cgo rules.                                              //
 // /////////////////////////////////////////////////////////////////////////////
-
+//
 // DLL_EXPORT int cmix_channels_get_id(int channels_instance_id) {
 // 	 return ChannelsRouter.getIdFn(channels_instance_id);
 // }
-
+//
 // DLL_EXPORT GoByteSlice cmix_channels_generate_channel_identity(int channels_instance_id, int cmix_id, GoError* err) {
 // 	 return ChannelsRouter.generateChannelIdentityFn(channels_instance_id, cmix_id, err);
 // }
-
+//
+// DLL_EXPORT GoByteSlice cmix_channels_construct_identity(int channels_instance_id, void* pubkey,int pubkey_len, int codeset, GoError* err) {
+//	 return ChannelsRouter.constructIdentityFn(channels_instance_id, pubkey, pubkey_len, codeset,  err );
+// }
+//
+// DLL_EXPORT GoByteSlice cmix_channels_import_private_identity(int channels_instance_id, char* password, int password_len, void* data, int data_len, GoError* err) {
+//	 return ChannelsRouter.importPrivateIdentityFn(channels_instance_id, passsword, password_len, data, data_len, err);
+// }
+//
+//
 // DLL_EXPORT void cmix_channels_set_router(ChannelsRouterFunctions cbs) {
 // 	ChannelsRouter.getIdFn = cbs.getIdFn;
 //  ChannelsRouter.generateChannelIdentityFn = cbs.generateChannelIdentityFn;
+//  ChannelsRouter.constructIdentityFn = cbs.constructIdentityFn
+//	ChannelsRouter.importPrivateIdentityFn = cbs.importPrivateIdentityFn
 // }
 
 import "C"

@@ -93,12 +93,16 @@ typedef struct {
 // Channels Callbacks
 typedef int (* cmix_channels_get_id_fn)(int channels_instance_id);
 typedef GoByteSlice (* cmix_channels_generate_channel_identity_fn)(int channels_instance_id, int cmix_id, GoError* err);
+typedef GoByteSlice (* cmix_channels_construct_identity_fn)(int channels_instance_id, void* pubkey,int pubkey_len, int codeset, GoError* err);
+typedef GoByteSlice (* cmix_channels_import_private_identity_fn)(int channels_instance_id, char* password, int password_len, void* data, int data_len, GoError* err);
   
 
 // This struct values must be set by your program, the symbol is called ChannelsRouter
 typedef struct{
   cmix_channels_get_id_fn getIdFn;
   cmix_channels_generate_channel_identity_fn generateChannelIdentityFn;
+  cmix_channels_construct_identity_fn constructIdentityFn;
+  cmix_channels_import_private_identity_fn importPrivateIdentityFn
 
 } ChannelsRouterFunctions;
 

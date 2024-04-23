@@ -72,6 +72,8 @@ package main
 //
 // extern int cmix_channels_get_id(int channels_instance_id);
 // extern GoByteSlice cmix_channels_generate_channel_identity(int channels_instance_id, int cmix_id, GoError* err);
+// extern GoByteSlice cmix_channels_construct_identity(int channels_instance_id, void* pubkey,int pubkey_len, int codeset, GoError* err);
+// extern GoByteSlice cmix_channels_import_private_identity(int channels_instance_id, char* password, int password_len, void* data, int data_len, GoError* err);
 // extern void cmix_channels_set_router(ChannelsRouterFunctions cbs);
 import "C"
 
@@ -523,6 +525,31 @@ func (cm *ChannelsManager) GenerateChannelIdentity(cmixId int) (bytes []byte, er
 	len := data2Copy.len
 	copy(res, buf[0:len])
 	return res, C.GoError{IsError: C.int(0), Msg: C.CString("")}
+}
+
+func (cm *ChannelsManager) ConstructIdentity(pubKey []byte, codesetVersion int) (bytes []byte, err C.GoError) {
+	data2Copy := C.cmix_channels_construct_identity(C.int(cm.id), C.CBytes(pubKey), C.int(len(pubKey)), C.int(codesetVersion), &err)
+	if err.IsError != 0 {
+		return []byte{}, C.GoError{IsError: C.int(1), Msg: C.CString("An error occured")}
+	}
+	res := make([]byte, data2Copy.len)
+	buf := *(*[]byte)(data2Copy.data)
+	len := data2Copy.len
+	copy(res, buf[0:len])
+	return res, C.GoError{IsError: C.int(0), Msg: C.CString("")}
+}
+
+func (cm *ChannelsManager) ImportPrivateIdentity(password string, data []byte) (bytes []byte, err C.GoError) {
+	data2Copy := C.cmix_channels_import_private_identity(C.int(cm.id), C.CString(password), C.int(len(password)), C.CBytes(data), C.int(len(data)), &err)
+	if err.IsError != 0 {
+		return []byte{}, C.GoError{IsError: C.int(1), Msg: C.CString("An error occured")}
+	}
+	res := make([]byte, data2Copy.len)
+	buf := *(*[]byte)(data2Copy.data)
+	len := data2Copy.len
+	copy(res, buf[0:len])
+	return res, C.GoError{IsError: C.int(0), Msg: C.CString("")}
+
 }
 
 func main() {}
