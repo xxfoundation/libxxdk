@@ -5,8 +5,7 @@ fn main() {
     eprintln!("{}", env::var("OUT_DIR").unwrap());
 
     cgo::Build::new()
-        .package("../../sharedcgo/main.go")
-        .package("../../sharedcgo/callbacks.go")
+        .package("../../sharedcgo")
         .build_mode(cgo::BuildMode::CArchive)
         .build("xxdk");
 
@@ -22,8 +21,7 @@ fn main() {
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings");
 
-    println!("cargo:rustc-link-search=native={}", "./target");
-    println!("cargo:rustc-link-lib=static={}", "xxdk");
+    println!("cargo:rustc-link-search=native=./target");
     println!("cargo:rustc-flags=-lresolv");
     #[cfg(target_os = "macos")]
     {
