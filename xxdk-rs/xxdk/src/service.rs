@@ -29,40 +29,58 @@ struct Response {
     partner_token: i32,
 }
 
-type HandlerFnInner = dyn Fn(IncomingRequest) -> Pin<Box<dyn Future<Output = Result<Vec<u8>, String>> + Send>>
+type HandlerFnInner<T> = dyn Fn(
+        Arc<T>,
+        IncomingRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<u8>, String>> + Send + 'static>>
     + Send
     + Sync
     + 'static;
 
-pub trait HandlerFn: Fn(IncomingRequest) -> Self::Future + Send + Sync + 'static {
-    type Future: Future<Output = Result<Vec<u8>, String>> + Send;
+pub trait HandlerFn<T>:
+    Fn(Arc<T>, IncomingRequest) -> Self::Future + Send + Sync + 'static
+{
+    type Future: Future<Output = Result<Vec<u8>, String>> + Send + 'static;
 }
 
-impl<F, Fut> HandlerFn for F
+impl<T, F, Fut> HandlerFn<T> for F
 where
-    F: Fn(IncomingRequest) -> Fut + Send + Sync + 'static,
-    Fut: Future<Output = Result<Vec<u8>, String>> + Send,
+    F: Fn(Arc<T>, IncomingRequest) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = Result<Vec<u8>, String>> + Send + 'static,
 {
     type Future = Fut;
 }
 
-#[derive(Clone)]
-pub struct Router {
-    handler: Arc<HandlerFnInner>,
+pub struct Router<T> {
+    handler: Arc<HandlerFnInner<T>>,
+    state: Arc<T>,
 }
 
-impl Router {
-    pub fn new<F>(handler: F) -> Self
-    where
-        F: HandlerFn,
-    {
+impl<T> Clone for Router<T> {
+    fn clone(&self) -> Self {
         Self {
-            handler: Arc::new(move |req| Box::pin(handler(req))),
+            handler: self.handler.clone(),
+            state: self.state.clone(),
         }
     }
 }
 
-impl Service<IncomingRequest> for Router {
+impl<T> Router<T> {
+    pub fn new<F>(handler: F, state: Arc<T>) -> Self
+    where
+        F: HandlerFn<T>,
+    {
+        Self {
+            handler: Arc::new(move |state, req| Box::pin(handler(state, req))),
+            state,
+        }
+    }
+}
+
+impl<T> Service<IncomingRequest> for Router<T>
+where
+    T: Send + Sync + 'static,
+{
     type Response = Vec<u8>;
 
     type Error = String;
@@ -74,7 +92,7 @@ impl Service<IncomingRequest> for Router {
     }
 
     fn call(&mut self, req: IncomingRequest) -> Self::Future {
-        (self.handler)(req)
+        (self.handler)(self.state.clone(), req)
     }
 }
 
@@ -89,7 +107,10 @@ pub struct CMixServerConfig {
 pub struct CMixServer;
 
 impl CMixServer {
-    pub async fn serve(router: Router, config: CMixServerConfig) -> Result<(), String> {
+    pub async fn serve<T>(router: Router<T>, config: CMixServerConfig) -> Result<(), String>
+    where
+        T: Send + Sync + 'static,
+    {
         eprintln!("[xxdk-rs] Starting cMix server");
         let ndf_contents = tokio::fs::read_to_string(&config.ndf_path)
             .await
@@ -167,8 +188,20 @@ impl CMixServer {
         eprintln!("[xxdk-rs] Listening for messages");
         while let Some(resp) = response_queue.recv().await {
             eprintln!("[xxdk-rs] Sending response");
-            if let Err(e) = dm.send(&resp.partner_pubkey, resp.partner_token, 0, &resp.text, 0, &[]) {
-                eprintln!("[xxdk-rs] Error sending response: {e}");
+            for window in resp.text.chunks(750) {
+                if let Err(e) = dm.send(
+                    &resp.partner_pubkey,
+                    resp.partner_token,
+                    0,
+                    window,
+                    0,
+                    &[],
+                ) {
+                    eprintln!("[xxdk-rs] Error sending response: {e}");
+                    break;
+                }
+
+                tokio::time::sleep(Duration::from_secs(4)).await;
             }
         }
 
@@ -176,14 +209,17 @@ impl CMixServer {
     }
 }
 
-struct CMixServerCallbacks {
-    router: Router,
+struct CMixServerCallbacks<T> {
+    router: Router<T>,
     server_pubkey: Arc<OnceLock<Vec<u8>>>,
     runtime: tokio::runtime::Handle,
     response_queue: mpsc::Sender<Response>,
 }
 
-impl CMixServerCallbacks {
+impl<T> CMixServerCallbacks<T>
+where
+    T: Send + Sync + 'static,
+{
     fn serve_req(&self, text: &[u8], sender_key: &[u8], dm_token: i32, timestamp: i64) {
         if sender_key != self.server_pubkey.get().unwrap() {
             let mut router = self.router.clone();
@@ -221,7 +257,10 @@ impl CMixServerCallbacks {
     }
 }
 
-impl callbacks::DmCallbacks for CMixServerCallbacks {
+impl<T> callbacks::DmCallbacks for CMixServerCallbacks<T>
+where
+    T: Send + Sync + 'static,
+{
     fn receive(
         &self,
         _message_id: &[u8],
