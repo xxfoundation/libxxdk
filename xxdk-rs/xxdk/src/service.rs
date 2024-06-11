@@ -111,7 +111,7 @@ impl CMixServer {
     where
         T: Send + Sync + 'static,
     {
-        eprintln!("[xxdk-rs] Starting cMix server");
+        tracing::info!("Starting cMix server");
         let ndf_contents = tokio::fs::read_to_string(&config.ndf_path)
             .await
             .map_err(|e| e.to_string())?;
@@ -120,7 +120,7 @@ impl CMixServer {
             let storage_dir = config.storage_dir.clone();
             let secret = config.secret.clone();
             tokio::task::spawn_blocking(move || {
-                eprintln!("[xxdk-rs] Creating storage directory");
+                tracing::info!("Creating storage directory");
                 base::CMix::create(&ndf_contents, &storage_dir, secret.as_bytes(), "")
             })
             .await
@@ -130,14 +130,14 @@ impl CMixServer {
         let storage_dir = config.storage_dir.clone();
         let secret = config.secret.clone();
         let cmix = tokio::task::spawn_blocking(move || {
-            eprintln!("[xxdk-rs] Loading storage directory");
+            tracing::info!("Loading storage directory");
             base::CMix::load(&storage_dir, secret.as_bytes(), &[])
         })
         .await
         .map_err(|e| e.to_string())??;
 
         let dm_id = cmix.ekv_get(DM_ID_EKV_KEY).or_else(|_| {
-            eprintln!("[xxdk-rs] Generating DM ID");
+            tracing::info!("Generating DM ID");
             let id = generate_codename_identity(&config.secret);
             cmix.ekv_set(DM_ID_EKV_KEY, &id)?;
             Ok::<_, String>(id)
@@ -152,17 +152,17 @@ impl CMixServer {
             response_queue: sender,
             server_pubkey: cbs_pubkey_lock.clone(),
         });
-        eprintln!("[xxdk-rs] Spawning DM client");
+        tracing::info!("Spawning DM client");
         let dm = cmix.new_dm_client(&dm_id, &config.secret, cbs)?;
 
         let cmix = Arc::new(cmix);
         tokio::task::spawn_blocking({
             let cmix = cmix.clone();
             move || {
-                eprintln!("[xxdk-rs] Starting network follower");
+                tracing::info!("Starting network follower");
                 cmix.start_network_follower(5000)?;
                 while let Err(e) = cmix.wait_for_network(20000) {
-                    eprintln!("[xxdk-rs] Waiting to connect to network: {e}");
+                    tracing::info!("Waiting to connect to network: {e}");
                 }
                 Ok::<_, String>(())
             }
@@ -170,7 +170,7 @@ impl CMixServer {
         .await
         .map_err(|e| e.to_string())??;
 
-        eprintln!("[xxdk-rs] Waiting until ready to send");
+        tracing::info!("Waiting until ready to send");
         while !cmix.ready_to_send() {
             tokio::time::sleep(Duration::from_secs(1)).await;
         }
@@ -178,26 +178,20 @@ impl CMixServer {
         let token = dm.get_token()?;
         let pubkey = dm.get_dm_pubkey()?;
         let pubkey_display = BASE64_STANDARD_NO_PAD.encode(&pubkey);
-        println!("[xxdk-rs] DMTOKEN: {}", token as u32);
-        println!("[xxdk-rs] DMPUBKEY: {pubkey_display}");
+        tracing::info!("DMTOKEN: {}", token as u32);
+        tracing::info!("DMPUBKEY: {pubkey_display}");
 
         // This shouldn't block, and should return Ok, since it's the only place where this cell is
         // initialized.
         cbs_pubkey_lock.set(pubkey).unwrap();
 
-        eprintln!("[xxdk-rs] Listening for messages");
+        tracing::debug!("Listening for messages");
         while let Some(resp) = response_queue.recv().await {
-            eprintln!("[xxdk-rs] Sending response");
+            tracing::debug!("Sending response");
             for window in resp.text.chunks(750) {
-                if let Err(e) = dm.send(
-                    &resp.partner_pubkey,
-                    resp.partner_token,
-                    0,
-                    window,
-                    0,
-                    &[],
-                ) {
-                    eprintln!("[xxdk-rs] Error sending response: {e}");
+                if let Err(e) = dm.send(&resp.partner_pubkey, resp.partner_token, 0, window, 0, &[])
+                {
+                    tracing::warn!(error = e, "Error sending response");
                     break;
                 }
 
@@ -232,22 +226,23 @@ where
             let response_queue = self.response_queue.clone();
             let sender_key = Vec::from(sender_key);
             self.runtime.spawn(async move {
-                eprintln!("[xxdk-rs] Evaluating router on request");
+                tracing::debug!("Evaluating router on request");
                 if poll_fn(|cx| router.poll_ready(cx)).await.is_ok() {
                     match router.call(req).await {
                         Err(e) => {
-                            eprintln!("[xxdk-rs] Error in servicing request: {e}");
+                            tracing::warn!(error = e, "Error in servicing request");
                         }
                         Ok(resp) => {
-                            if let Err(e) = response_queue
+                            if response_queue
                                 .send(Response {
                                     text: resp,
                                     partner_pubkey: sender_key,
                                     partner_token: dm_token,
                                 })
                                 .await
+                                .is_err()
                             {
-                                eprintln!("[xxdk-rs] Error queuing response: {e}");
+                                tracing::warn!(partner_token = dm_token, "Error queuing response");
                             }
                         }
                     }
@@ -275,7 +270,7 @@ where
         _message_type: i64,
         _status: i64,
     ) -> i64 {
-        eprintln!("[xxdk-rs] Received raw from token {dm_token}");
+        tracing::debug!(dm_token, "Received raw");
         self.serve_req(text, sender_key, dm_token, timestamp);
         0
     }
@@ -293,7 +288,7 @@ where
         _round_id: i64,
         _status: i64,
     ) -> i64 {
-        eprintln!("[xxdk-rs] Received text from token {dm_token}");
+        tracing::debug!(dm_token, "Received text");
         self.serve_req(text.as_bytes(), sender_key, dm_token, timestamp);
         0
     }
@@ -312,7 +307,7 @@ where
         _round_id: i64,
         _status: i64,
     ) -> i64 {
-        eprintln!("[xxdk-rs] Received reply from token {dm_token}");
+        tracing::debug!(dm_token, "Received reply");
         0
     }
 
@@ -330,7 +325,7 @@ where
         _round_id: i64,
         _status: i64,
     ) -> i64 {
-        eprintln!("[xxdk-rs] Received reaction from token {dm_token}");
+        tracing::debug!(dm_token, "Received reaction");
         0
     }
 

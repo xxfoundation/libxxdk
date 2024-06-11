@@ -12,4 +12,5 @@ libc = "0.2.153"
 serde = { version = "1.0.202", features = ["derive"] }
 tokio = { version = "1.37.0", features = ["rt", "fs", "sync", "time"] }
 tower = "0.4.13"
+tracing = "0.1.40"
 xxdk-sys = { version = "0.1.0", path = "../xxdk-sys" }
