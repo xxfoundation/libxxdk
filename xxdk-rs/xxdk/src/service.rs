@@ -185,18 +185,24 @@ impl CMixServer {
         // initialized.
         cbs_pubkey_lock.set(pubkey).unwrap();
 
+        let dm = Arc::new(dm);
+
         tracing::debug!("Listening for messages");
         while let Some(resp) = response_queue.recv().await {
-            tracing::debug!("Sending response");
-            for window in resp.text.chunks(750) {
-                if let Err(e) = dm.send(&resp.partner_pubkey, resp.partner_token, 0, window, 0, &[])
-                {
-                    tracing::warn!(error = e, "Error sending response");
-                    break;
-                }
+            let dm = dm.clone();
+            tokio::spawn(async move {
+                tracing::debug!("Sending response");
+                for window in resp.text.chunks(750) {
+                    if let Err(e) =
+                        dm.send(&resp.partner_pubkey, resp.partner_token, 0, window, 0, &[])
+                    {
+                        tracing::warn!(error = e, "Error sending response");
+                        break;
+                    }
 
-                tokio::time::sleep(Duration::from_secs(4)).await;
-            }
+                    tokio::time::sleep(Duration::from_secs(4)).await;
+                }
+            });
         }
 
         cmix.stop_network_follower()
