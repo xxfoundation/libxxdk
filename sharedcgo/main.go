@@ -69,6 +69,20 @@ package main
 //    long event_type, void* json_data,
 //    int json_data_len);
 // extern void cmix_dm_set_router(DMReceiverRouterFunctions cbs);
+// // RPC callback functions
+// static void invoke_rpc_fn(void (*f)(void*, int), void *b, int b_len) {
+//    f(b, b_len);
+// }
+// typedef void (* cmix_rpc_send_response_fn)(void *response, int response_len);
+// typedef void (* cmix_rpc_send_error_fn)(void *error_str, int error_str_len);
+// static GoByteSlice invoke_rpc_server_fn(
+//    GoByteSlice (*f)(void*, int, void*, int),
+//    void *s, int s_len, void *r, int r_len) {
+//        return f(s, s_len, r, r_len);
+// }
+// typedef GoByteSlice (* cmix_rpc_server_callback_fn)(
+//   void *sender, int sender_len,
+//   void *request, int request_len);
 import "C"
 
 import (
@@ -78,6 +92,7 @@ import (
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/client/v4/bindings"
+	"gitlab.com/elixxir/client/v4/dm"
 	"gitlab.com/elixxir/crypto/codename"
 	"gitlab.com/elixxir/crypto/fastRNG"
 	"gitlab.com/xx_network/crypto/csprng"
@@ -291,7 +306,7 @@ func cmix_dm_NewDMClient(cMixInstanceID int32, codenameIdentity []byte,
 		return -1, makeError(err)
 	}
 	myReceiver := &dmReceiver{}
-	receiver := bindings.NewDMReceiver(myReceiver)
+	receiver := dm.NewDMReceiver(myReceiver)
 	notifications, _ := bindings.LoadNotificationsDummy(int(cMixInstanceID))
 	notificationsID := notifications.GetID()
 	dmClient, err := bindings.NewDMClientWithGoEventModel(
@@ -496,4 +511,135 @@ func (dmr *dmReceiver) EventUpdate(eventType int64, jsonData []byte) {
 	C.cmix_dm_event_update(C.int(dmr.dmClientID), C.long(eventType),
 		C.CBytes(jsonData), C.int(len(jsonData)))
 }
+
+////
+// RPC Methods
+////
+
+//export cmix_rpc_send
+func cmix_rpc_send(cMixInstanceID int32, recipient, pubkey, request []byte) (
+	int32, C.GoError) {
+	res := bindings.RPCSend(int(cMixInstanceID), recipient, pubkey, request)
+
+	rpcLock.Lock()
+	defer rpcLock.Unlock()
+	rid := curRPCResponseID
+	rpcResponses[rid] = res
+	curRPCResponseID += 1
+
+	// TODO: kick off a thread to clean up old responses
+
+	return rid, makeError(nil)
+}
+
+//export cmix_rpc_send_callback
+func cmix_rpc_send_callback(response_id int32,
+	resFn C.cmix_rpc_send_response_fn,
+	errFn C.cmix_rpc_send_error_fn) {
+	rpcLock.Lock()
+	res, ok := rpcResponses[response_id]
+	rpcLock.Unlock()
+	if !ok {
+		errStr := []byte(fmt.Sprintf("cannot find response %d", response_id))
+		C.invoke_rpc_fn(errFn, C.CBytes(errStr), C.int(len(errStr)))
+		return
+	}
+	res.Callback(&rpcCbs{
+		response: func(response []byte) {
+			C.invoke_rpc_fn(resFn, C.CBytes(response),
+				C.int(len(response)))
+		},
+		errorFn: func(err_str string) {
+			e := []byte(err_str)
+			C.invoke_rpc_fn(errFn, C.CBytes(e), C.int(len(e)))
+		},
+	})
+}
+
+//export cmix_rpc_send_wait
+func cmix_rpc_send_wait(response_id int32) C.GoByteSlice {
+	rpcLock.Lock()
+	res, ok := rpcResponses[response_id]
+	rpcLock.Unlock()
+	if !ok {
+		return makeBytes(nil)
+	}
+	return makeBytes(res.Await())
+}
+
+//export cmix_rpc_generate_reception_id
+func cmix_rpc_generate_reception_id(cMixID int32) (C.GoByteSlice, C.GoError) {
+	i, err := bindings.GenerateRandomReceptionID(int(cMixID))
+	return makeBytes(i), makeError(err)
+}
+
+//export cmix_rpc_generate_random_rpc_key
+func cmix_rpc_generate_random_rpc_key(cMixID int32) (C.GoByteSlice, C.GoError) {
+	i, err := bindings.GenerateRandomRPCKey(int(cMixID))
+	return makeBytes(i), makeError(err)
+}
+
+//export cmix_rpc_new_server
+func cmix_rpc_new_server(cMixID int32, cb C.cmix_rpc_server_callback_fn,
+	reception_id, private_key []byte) (int32, C.GoError) {
+	srvCb := &rpcServerCb{
+		cb: func(sender, request []byte) []byte {
+			r := C.invoke_rpc_server_fn(cb, C.CBytes(sender), C.int(len(sender)),
+				C.CBytes(request), C.int(len(request)))
+
+			return C.GoBytes(r.data, r.len)
+		},
+	}
+
+	server, err := bindings.NewRPCServer(int(cMixID), srvCb, reception_id,
+		private_key)
+	if err != nil {
+		return 0, makeError(err)
+	}
+
+	rpcLock.Lock()
+	defer rpcLock.Unlock()
+	rid := curRPCServerID
+	rpcServers[rid] = server
+	curRPCServerID += 1
+
+	return rid, makeError(nil)
+}
+
+//export cmix_rpc_load_server
+func cmix_rpc_load_server(cMixID int32, cb C.cmix_rpc_server_callback_fn) (
+	int32, C.GoError) {
+	srvCb := &rpcServerCb{
+		cb: func(sender, request []byte) []byte {
+			r := C.invoke_rpc_server_fn(cb, C.CBytes(sender), C.int(len(sender)),
+				C.CBytes(request), C.int(len(request)))
+
+			return C.GoBytes(r.data, r.len)
+		},
+	}
+
+	server, err := bindings.LoadRPCServer(int(cMixID), srvCb)
+	if err != nil {
+		return 0, makeError(err)
+	}
+
+	rpcLock.Lock()
+	defer rpcLock.Unlock()
+	rid := curRPCServerID
+	rpcServers[rid] = server
+	curRPCServerID += 1
+
+	return rid, makeError(nil)
+}
+
+//export cmix_rpc_server_start
+func cmix_rpc_server_start(rpcID int32) {
+	rpcServers[rpcID].Start()
+}
+
+//export cmix_rpc_server_stop
+func cmix_rpc_server_stop(rpcID int32) {
+	rpcServers[rpcID].Stop()
+}
+
 func main() {}
