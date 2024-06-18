@@ -508,9 +508,30 @@ func cmix_rpc_send(cMixInstanceID int32, recipient, pubkey, request []byte,
 	int32, C.GoError) {
 	res := bindings.RPCSend(int(cMixInstanceID), recipient, pubkey, request)
 
-	// In FFI we skip the kludge of calling the call back
-	// functions by first pre-registering the c part and asking for a
-	// pointer to an object which we will reference.
+	rpcLock.Lock()
+	defer rpcLock.Unlock()
+	rid := curRPCResponseID
+	rpcResponses[rid] = res
+	curRPCResponseID += 1
+
+	// TODO: kick off a thread to clean up old responses
+
+	return rid, makeError(nil)
+}
+
+//export cmix_rpc_send_callback
+func cmix_rpc_send_callback(response_id int32,
+	callbackObject unsafe.Pointer) {
+	rpcLock.Lock()
+	res, ok := rpcResponses[response_id]
+	rpcLock.Unlock()
+	if !ok {
+		errStr := []byte(fmt.Sprintf("cannot find response %d",
+			response_id))
+		C.cmix_rpc_send_error(callbackObject,
+			C.CBytes(errStr), C.int(len(errStr)))
+		return
+	}
 	res.Callback(&rpcCbs{
 		response: func(r []byte) {
 			C.cmix_rpc_send_response(callbackObject,
@@ -521,16 +542,6 @@ func cmix_rpc_send(cMixInstanceID int32, recipient, pubkey, request []byte,
 				C.CBytes([]byte(e)), C.int(len(e)))
 		},
 	})
-
-	rpcLock.Lock()
-	defer rpcLock.Unlock()
-	rid := curRPCResponseID
-	rpcResponses[rid] = res
-	curRPCResponseID += 1
-
-	// TODO: kick off a thread to clean up old responses
-
-	return rid, makeError(nil)
 }
 
 //export cmix_rpc_send_wait
