@@ -126,4 +126,31 @@ package main
 //     DMReceiverRouter.deleteMessageFn = cbs.deleteMessageFn;
 //     DMReceiverRouter.eventUpdateFn = cbs.eventUpdateFn;
 // }
+//
+// cmix_rpc_send_response_fn cmix_rpc_send_response_cb;
+// cmix_rpc_send_error_fn cmix_rpc_send_error_cb;
+// DLL_EXPORT int register_cmix_rpc_send_callbacks(
+//    cmix_rpc_send_response_fn response_fn,
+//    cmix_rpc_send_error_fn error_fn) {
+//    cmix_rpc_send_response_cb = response_fn;
+//    cmix_rpc_send_error_cb = error_fn;
+//    return 1;
+// }
+// cmix_rpc_server_callback_fn cmix_rpc_server_cb;
+// DLL_EXPORT int register_cmix_rpc_server_callback(
+//    cmix_rpc_server_callback_fn cb) {
+//    cmix_rpc_server_cb = cb;
+//    return 1;
+// }
+// void cmix_rpc_send_response(void *obj, void *response, int response_len) {
+//    cmix_rpc_send_error_cb(obj, response, response_len);
+// }
+// void cmix_rpc_send_error(void *obj, void *response, int response_len) {
+//    cmix_rpc_send_error_cb(obj, response, response_len);
+// }
+// GoByteSlice cmix_rpc_server_request(void *obj,
+//   void *sender, int sender_len,
+//   void *request, int request_len) {
+//    return cmix_rpc_server_cb(obj, sender, sender_len, request, request_len);
+// }
 import "C"

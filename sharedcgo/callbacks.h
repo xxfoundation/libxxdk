@@ -8,9 +8,16 @@
 #define CALLBACKS_H
 
 typedef struct {
-     int   len;
-     void* data;
+  int   len;
+  void* data;
 } GoByteSlice;
+
+typedef struct {
+  int   IsError;
+  char* Msg;
+  int   MsgLen;
+} GoError;
+
 
 typedef long (* cmix_dm_receive_fn)(int dm_instance_id,
   void* message_id, int message_id_len,
@@ -79,6 +86,14 @@ typedef struct {
   cmix_dm_delete_message_fn deleteMessageFn;
   cmix_dm_event_update_fn eventUpdateFn;
 } DMReceiverRouterFunctions;
+
+typedef void (* cmix_rpc_send_response_fn)(void *obj,
+  void *response, int response_len);
+typedef void (* cmix_rpc_send_error_fn)(void *obj,
+  void *error_str, int error_str_len);
+typedef GoByteSlice (* cmix_rpc_server_callback_fn)(void *obj,
+  void *sender, int sender_len,
+  void *request, int request_len);
 
 #ifdef _WIN32
 #define DLL_EXPORT __declspec(dllexport)

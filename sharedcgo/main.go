@@ -10,12 +10,6 @@ package main
 // #include "callbacks.h"
 // #cgo CFLAGS: -I .
 //
-// typedef struct {
-//	int   IsError;
-//	char* Msg;
-//      int   MsgLen;
-// } GoError;
-//
 // // below are the callbacks defined in callbacks.go
 // extern long cmix_dm_receive(int dm_instance_id,
 //    void* mesage_id, int message_id_len,
@@ -69,18 +63,9 @@ package main
 //    long event_type, void* json_data,
 //    int json_data_len);
 // extern void cmix_dm_set_router(DMReceiverRouterFunctions cbs);
-// // RPC callback functions
-// static void invoke_rpc_fn(void (*f)(void*, int), void *b, int b_len) {
-//    f(b, b_len);
-// }
-// typedef void (* cmix_rpc_send_response_fn)(void *response, int response_len);
-// typedef void (* cmix_rpc_send_error_fn)(void *error_str, int error_str_len);
-// static GoByteSlice invoke_rpc_server_fn(
-//    GoByteSlice (*f)(void*, int, void*, int),
-//    void *s, int s_len, void *r, int r_len) {
-//        return f(s, s_len, r, r_len);
-// }
-// typedef GoByteSlice (* cmix_rpc_server_callback_fn)(
+// extern void cmix_rpc_send_response(void *obj, void *response, int response_len);
+// extern void cmix_rpc_send_error(void *obj, void *response, int response_len);
+// extern GoByteSlice cmix_rpc_server_request(void *obj,
 //   void *sender, int sender_len,
 //   void *request, int request_len);
 import "C"
@@ -88,6 +73,7 @@ import "C"
 import (
 	"fmt"
 	"strings"
+	"unsafe"
 
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
@@ -517,9 +503,24 @@ func (dmr *dmReceiver) EventUpdate(eventType int64, jsonData []byte) {
 ////
 
 //export cmix_rpc_send
-func cmix_rpc_send(cMixInstanceID int32, recipient, pubkey, request []byte) (
+func cmix_rpc_send(cMixInstanceID int32, recipient, pubkey, request []byte,
+	callbackObject unsafe.Pointer) (
 	int32, C.GoError) {
 	res := bindings.RPCSend(int(cMixInstanceID), recipient, pubkey, request)
+
+	// In FFI we skip the kludge of calling the call back
+	// functions by first pre-registering the c part and asking for a
+	// pointer to an object which we will reference.
+	res.Callback(&rpcCbs{
+		response: func(r []byte) {
+			C.cmix_rpc_send_response(callbackObject,
+				C.CBytes(r), C.int(len(r)))
+		},
+		errorFn: func(e string) {
+			C.cmix_rpc_send_error(callbackObject,
+				C.CBytes([]byte(e)), C.int(len(e)))
+		},
+	})
 
 	rpcLock.Lock()
 	defer rpcLock.Unlock()
@@ -530,30 +531,6 @@ func cmix_rpc_send(cMixInstanceID int32, recipient, pubkey, request []byte) (
 	// TODO: kick off a thread to clean up old responses
 
 	return rid, makeError(nil)
-}
-
-//export cmix_rpc_send_callback
-func cmix_rpc_send_callback(response_id int32,
-	resFn C.cmix_rpc_send_response_fn,
-	errFn C.cmix_rpc_send_error_fn) {
-	rpcLock.Lock()
-	res, ok := rpcResponses[response_id]
-	rpcLock.Unlock()
-	if !ok {
-		errStr := []byte(fmt.Sprintf("cannot find response %d", response_id))
-		C.invoke_rpc_fn(errFn, C.CBytes(errStr), C.int(len(errStr)))
-		return
-	}
-	res.Callback(&rpcCbs{
-		response: func(response []byte) {
-			C.invoke_rpc_fn(resFn, C.CBytes(response),
-				C.int(len(response)))
-		},
-		errorFn: func(err_str string) {
-			e := []byte(err_str)
-			C.invoke_rpc_fn(errFn, C.CBytes(e), C.int(len(e)))
-		},
-	})
 }
 
 //export cmix_rpc_send_wait
@@ -580,11 +557,12 @@ func cmix_rpc_generate_random_rpc_key(cMixID int32) (C.GoByteSlice, C.GoError) {
 }
 
 //export cmix_rpc_new_server
-func cmix_rpc_new_server(cMixID int32, cb C.cmix_rpc_server_callback_fn,
+func cmix_rpc_new_server(cMixID int32, callbackObj unsafe.Pointer,
 	reception_id, private_key []byte) (int32, C.GoError) {
 	srvCb := &rpcServerCb{
 		cb: func(sender, request []byte) []byte {
-			r := C.invoke_rpc_server_fn(cb, C.CBytes(sender), C.int(len(sender)),
+			r := C.cmix_rpc_server_request(callbackObj,
+				C.CBytes(sender), C.int(len(sender)),
 				C.CBytes(request), C.int(len(request)))
 
 			return C.GoBytes(r.data, r.len)
@@ -607,11 +585,12 @@ func cmix_rpc_new_server(cMixID int32, cb C.cmix_rpc_server_callback_fn,
 }
 
 //export cmix_rpc_load_server
-func cmix_rpc_load_server(cMixID int32, cb C.cmix_rpc_server_callback_fn) (
+func cmix_rpc_load_server(cMixID int32, callbackObj unsafe.Pointer) (
 	int32, C.GoError) {
 	srvCb := &rpcServerCb{
 		cb: func(sender, request []byte) []byte {
-			r := C.invoke_rpc_server_fn(cb, C.CBytes(sender), C.int(len(sender)),
+			r := C.cmix_rpc_server_request(callbackObj,
+				C.CBytes(sender), C.int(len(sender)),
 				C.CBytes(request), C.int(len(request)))
 
 			return C.GoBytes(r.data, r.len)
