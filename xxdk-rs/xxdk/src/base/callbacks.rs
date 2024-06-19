@@ -9,7 +9,11 @@ use std::collections::HashMap;
 use std::os::raw::{c_char, c_int, c_long, c_void};
 use std::sync::{Arc, RwLock};
 
-use xxdk_sys::{cmix_dm_set_router, DMReceiverRouterFunctions, GoByteSlice};
+use xxdk_sys::{
+    cmix_dm_set_router, cmix_rpc_send_callback, cmix_rpc_send_wait,
+    register_cmix_rpc_send_callbacks, register_cmix_rpc_server_callback, DMReceiverRouterFunctions,
+    GoByteSlice,
+};
 
 use crate::util::{
     clone_bytes_from_raw_parts, clone_bytes_into_c_buffer, clone_string_from_raw_parts,
@@ -469,4 +473,89 @@ extern "C" fn event_update_cb(
             cbs.event_update(event_type as i64, &json_data)
         },
     );
+}
+
+// RPC Callback functions
+
+#[derive(Debug)]
+pub struct RpcResponse {
+    pub(crate) instance_id: i32,
+    pub response_fn: Option<&'static fn(Vec<u8>) -> ()>,
+    pub error_fn: Option<&'static fn(Vec<u8>) -> ()>,
+}
+
+impl RpcResponse {
+    pub fn callback(&mut self, response_fn: &'static fn(Vec<u8>), err_fn: &'static fn(Vec<u8>)) {
+        self.response_fn = Some(response_fn);
+        self.error_fn = Some(err_fn);
+        let ptr: *mut c_void = self as *mut _ as *mut c_void;
+        unsafe { cmix_rpc_send_callback(self.instance_id, ptr) }
+    }
+    pub fn wait(&self) {
+        unsafe {
+            cmix_rpc_send_wait(self.instance_id);
+        }
+    }
+}
+
+extern "C" fn cmix_rpc_send_response_cb(
+    target: *mut c_void,
+    response: *mut c_void,
+    response_len: c_int,
+) {
+    unsafe {
+        let rpc_obj = &mut *(target as *mut RpcResponse);
+        let r = response as *const u8;
+        let rs = response_len as usize;
+        let response = clone_bytes_from_raw_parts(r, rs);
+        let rfn = (*rpc_obj).response_fn.unwrap() as &fn(Vec<u8>);
+        rfn(response);
+    }
+}
+
+extern "C" fn cmix_rpc_send_error_cb(target: *mut c_void, err: *mut c_void, err_len: c_int) {
+    unsafe {
+        let rpc_obj = &mut *(target as *mut RpcResponse);
+        let e = err as *const u8;
+        let es = err_len as usize;
+        let response = clone_bytes_from_raw_parts(e, es);
+        let efn = (*rpc_obj).error_fn.unwrap() as &fn(Vec<u8>);
+        efn(response);
+    }
+}
+
+#[derive(Debug)]
+pub struct RpcServerRequest {
+    pub request_fn: &'static fn(Vec<u8>, Vec<u8>) -> Vec<u8>,
+}
+
+extern "C" fn cmix_rpc_server_cb(
+    target: *mut c_void,
+    sender: *mut c_void,
+    sender_len: c_int,
+    request: *mut c_void,
+    request_len: c_int,
+) -> GoByteSlice {
+    unsafe {
+        let rpc_obj = &mut *(target as *mut RpcServerRequest);
+        let s = sender as *const u8;
+        let ss = sender_len as usize;
+        let sndr = clone_bytes_from_raw_parts(s, ss);
+        let r = request as *const u8;
+        let rs = request_len as usize;
+        let req = clone_bytes_from_raw_parts(r, rs);
+        let sfn = (*rpc_obj).request_fn as &fn(Vec<u8>, Vec<u8>) -> Vec<u8>;
+        let res = sfn(sndr, req);
+        return clone_bytes_into_c_buffer(&res);
+    }
+}
+
+pub fn set_rpc_callbacks() {
+    unsafe {
+        register_cmix_rpc_send_callbacks(
+            Some(cmix_rpc_send_response_cb),
+            Some(cmix_rpc_send_error_cb),
+        );
+        register_cmix_rpc_server_callback(Some(cmix_rpc_server_cb));
+    }
 }
