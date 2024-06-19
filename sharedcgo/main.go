@@ -68,6 +68,11 @@ package main
 // extern GoByteSlice cmix_rpc_server_request(void *obj,
 //   void *sender, int sender_len,
 //   void *request, int request_len);
+// extern int register_cmix_rpc_send_callbacks(
+//    cmix_rpc_send_response_fn response_fn,
+//    cmix_rpc_send_error_fn error_fn);
+// extern int register_cmix_rpc_server_callback(
+//    cmix_rpc_server_callback_fn cb);
 import "C"
 
 import (
@@ -503,8 +508,7 @@ func (dmr *dmReceiver) EventUpdate(eventType int64, jsonData []byte) {
 ////
 
 //export cmix_rpc_send
-func cmix_rpc_send(cMixInstanceID int32, recipient, pubkey, request []byte,
-	callbackObject unsafe.Pointer) (
+func cmix_rpc_send(cMixInstanceID int32, recipient, pubkey, request []byte) (
 	int32, C.GoError) {
 	res := bindings.RPCSend(int(cMixInstanceID), recipient, pubkey, request)
 
