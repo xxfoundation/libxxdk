@@ -2,7 +2,6 @@
 //!
 //! This module provides safe Rust wrappers around the raw FFI bindings in `xxdk-sys`.
 
-use crate::base::callbacks::RpcResponse;
 use crate::util::*;
 use xxdk_sys::*;
 
@@ -302,32 +301,6 @@ pub mod cmix {
                 );
                 go_error_into_result(|| c_byte_slice_into_vec(r0), r1)
             }
-        }
-    }
-
-    pub fn send_rpc(
-        net: &CMix,
-        recipient: &[u8],
-        pubkey: &[u8],
-        request: &[u8],
-    ) -> Result<RpcResponse, String> {
-        unsafe {
-            let cmix_rpc_send_return { r0, r1 } = cmix_rpc_send(
-                net.cmix_instance,
-                bytes_as_go_slice(recipient),
-                bytes_as_go_slice(pubkey),
-                bytes_as_go_slice(request),
-            );
-            return go_error_into_result(
-                || {
-                    return RpcResponse {
-                        instance_id: r0,
-                        response_fn: None,
-                        error_fn: None,
-                    };
-                },
-                r1,
-            );
         }
     }
 }
