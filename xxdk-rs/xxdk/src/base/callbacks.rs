@@ -526,7 +526,7 @@ extern "C" fn cmix_rpc_send_error_cb(target: *mut c_void, err: *mut c_void, err_
 
 #[derive(Debug)]
 pub struct RpcServerRequest {
-    pub request_fn: &'static fn(Vec<u8>, Vec<u8>) -> Vec<u8>,
+    pub request_fn: fn(Vec<u8>, Vec<u8>) -> Vec<u8>,
 }
 
 extern "C" fn cmix_rpc_server_cb(
@@ -544,7 +544,7 @@ extern "C" fn cmix_rpc_server_cb(
         let r = request as *const u8;
         let rs = request_len as usize;
         let req = clone_bytes_from_raw_parts(r, rs);
-        let sfn = (*rpc_obj).request_fn as &fn(Vec<u8>, Vec<u8>) -> Vec<u8>;
+        let sfn = rpc_obj.request_fn;
         let res = sfn(sndr, req);
         return clone_bytes_into_c_buffer(&res);
     }
