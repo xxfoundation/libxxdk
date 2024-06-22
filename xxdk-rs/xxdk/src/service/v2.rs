@@ -1,8 +1,6 @@
-use std::collections::HashMap;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use serde::de::DeserializeOwned;
@@ -12,7 +10,7 @@ use tower::Service;
 
 #[derive(Debug, Clone, Deserialize)]
 struct RawRequest {
-    method: String,
+    // method: String,
     #[serde(flatten)]
     params: json::Value,
 }
