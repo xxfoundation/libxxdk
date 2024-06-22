@@ -6,7 +6,7 @@ use libc::*;
 use xxdk_sys::*;
 
 use crate::base::callbacks::{RpcResponse, RpcServerRequest};
-use crate::base::cmix::CMix;
+use crate::base::CMix;
 use crate::util::*;
 
 pub fn send(
@@ -53,6 +53,7 @@ pub fn generate_random_rpc_key(net: &CMix) -> Result<Vec<u8>, String> {
 
 pub struct Server {
     pub(crate) instance_id: i32,
+    #[allow(dead_code)]
     pub(crate) cb: RpcServerRequest,
 }
 

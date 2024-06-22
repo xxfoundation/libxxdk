@@ -6,7 +6,7 @@ use std::time::Duration;
 use base64::prelude::*;
 use structopt::StructOpt;
 use xxdk::base::callbacks::DmCallbacks;
-use xxdk::base::cmix::*;
+use xxdk::base::*;
 
 const SECRET: &str = "Hello";
 const REGISTRATION_CODE: &str = "";

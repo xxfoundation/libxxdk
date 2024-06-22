@@ -19,7 +19,7 @@ use crate::util::{
     clone_bytes_from_raw_parts, clone_bytes_into_c_buffer, clone_string_from_raw_parts,
 };
 
-use super::cmix::Dm;
+use super::Dm;
 
 #[allow(clippy::too_many_arguments)]
 pub trait DmCallbacks: Send + Sync + 'static {
