@@ -12,8 +12,6 @@ use serde::Deserialize;
 use tokio::sync::mpsc;
 use tower::Service;
 
-pub mod v2;
-
 const DM_ID_EKV_KEY: &str = "MyDMID";
 
 #[derive(Debug, Clone)]
