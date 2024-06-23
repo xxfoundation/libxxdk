@@ -1,11 +1,11 @@
-//! Base XXDK functions.
+//! RPC XXDK functions.
 //!
 //! This module provides safe Rust wrappers around the raw FFI bindings in `xxdk-sys`.
 
 use libc::*;
 use xxdk_sys::*;
 
-use crate::base::callbacks::{RpcResponse, RpcServerRequest};
+use crate::base::callbacks::{RpcResponse, RpcServerRequestHandler};
 use crate::base::CMix;
 use crate::util::*;
 
@@ -54,29 +54,33 @@ pub fn generate_random_key(net: &CMix) -> Result<Vec<u8>, String> {
 pub fn derive_public_key(private_key: &[u8]) -> Result<Vec<u8>, String> {
     unsafe {
         let prk = bytes_as_go_slice(&private_key);
-        unsafe {
-            let cmix_rpc_derive_public_key_return { r0, r1 } = cmix_rpc_derive_public_key(prk);
-            go_error_into_result(|| c_byte_slice_into_vec(r0), r1)
-        }
+        let cmix_rpc_derive_public_key_return { r0, r1 } = cmix_rpc_derive_public_key(prk);
+        go_error_into_result(|| c_byte_slice_into_vec(r0), r1)
     }
+}
+
+pub trait ServerCallback {
+    fn serve_req(&self, sender_id: Vec<u8>, request: Vec<u8>) -> Vec<u8>;
 }
 
 pub struct Server {
     pub(crate) instance_id: i32,
     #[allow(dead_code)]
-    pub(crate) cb: RpcServerRequest,
+    pub(crate) cb: RpcServerRequestHandler,
 }
 
-pub fn new_server(
+pub fn new_server<T: ServerCallback + 'static>(
     net: &CMix,
-    request_callback: fn(Vec<u8>, Vec<u8>) -> Vec<u8>,
+    request_callback: T,
     reception_id: Vec<u8>,
     private_key: Vec<u8>,
 ) -> Result<Server, String> {
     // This is absolutely unsafe to leave mutable without synchronization; I don't think it *needs*
     // to be mutable though. Investigate later
-    let mut cb = RpcServerRequest {
-        request_fn: request_callback,
+    let mut cb = RpcServerRequestHandler {
+        request_fn: Box::new(move |sender_id: Vec<u8>, request: Vec<u8>| -> Vec<u8> {
+            return request_callback.serve_req(sender_id, request);
+        }),
     };
     unsafe {
         let cb_obj: *mut c_void = &mut cb as *mut _ as *mut c_void;
@@ -96,12 +100,14 @@ pub fn new_server(
     }
 }
 
-pub fn load_server(
+pub fn load_server<T: ServerCallback + 'static>(
     net: &CMix,
-    request_callback: fn(Vec<u8>, Vec<u8>) -> Vec<u8>,
+    request_callback: T,
 ) -> Result<Server, String> {
-    let mut cb = RpcServerRequest {
-        request_fn: request_callback,
+    let mut cb = RpcServerRequestHandler {
+        request_fn: Box::new(move |sender_id: Vec<u8>, request: Vec<u8>| -> Vec<u8> {
+            return request_callback.serve_req(sender_id, request);
+        }),
     };
     unsafe {
         let cb_obj: *mut c_void = &mut cb as *mut _ as *mut c_void;

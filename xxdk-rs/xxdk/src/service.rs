@@ -1,32 +1,24 @@
-use std::future::{poll_fn, Future};
-use std::pin::Pin;
-use std::sync::{Arc, OnceLock};
-use std::task::Poll;
-use std::time::Duration;
-
 use base64::prelude::*;
 use serde::Deserialize;
+use std::future::{poll_fn, Future};
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::Poll;
+use std::time::Duration;
 use tokio::sync::mpsc;
 use tower::Service;
 
 use crate::base;
 use crate::rpc;
 
-const DM_ID_EKV_KEY: &str = "MyDMID";
-
 #[derive(Debug, Clone)]
 pub struct IncomingRequest {
-    pub text: Vec<u8>,
-    pub sender_key: Vec<u8>,
-    pub dm_token: i32,
-    pub timestamp: i64,
+    pub sender_id: Vec<u8>,
+    pub request: Vec<u8>,
 }
-
 #[derive(Debug, Clone)]
 struct Response {
-    text: Vec<u8>,
-    partner_pubkey: Vec<u8>,
-    partner_token: i32,
+    pub text: Vec<u8>,
 }
 
 type HandlerFnInner<T> = dyn Fn(
@@ -139,63 +131,65 @@ impl CMixServer {
         .map_err(|e| e.to_string())??;
 
         // Reception ID Load or Generate
-        let reception_id_b64 = config.secret.clone();
+        let mut reception_id_b64 = config.secret.clone();
         let reception_id: Vec<u8>;
-        if reception_id_b64.len() == 0 {
-            cmix.ekv_get("rpc_server_reception_id")
-                .and_then(|r| {
-                    reception_id = r;
+        if reception_id_b64.is_empty() {
+            match cmix.ekv_get("rpc_server_reception_id") {
+                Ok(r) => {
                     tracing::info!("Loaded Reception ID From EKV...");
-                })
-                .or_else(|| {
+                    reception_id = r;
+                }
+                Err(_) => {
                     reception_id = rpc::generate_reception_id(&cmix)?;
                     tracing::info!("Generating Random Reception ID...");
-                });
+                }
+            }
         } else {
             reception_id = BASE64_STANDARD_NO_PAD
                 .decode(reception_id_b64)
                 .map_err(|e| e.to_string())?;
             tracing::info!("Loaded Reception ID From config...");
         }
-        reception_id_b64 = BASE64_STANDARD_NO_PAD.encode(reception_id);
+        reception_id_b64 = BASE64_STANDARD_NO_PAD.encode(&reception_id);
         tracing::info!("RPC Reception ID: {reception_id_b64}");
         cmix.ekv_set("rpc_server_reception_id", &reception_id)?;
 
         // Private Key Load or Generate
         let private_key_b64 = config.secret.clone();
         let private_key: Vec<u8>;
-        if private_key_b64.len() == 0 {
-            cmix.ekv_get("rpc_server_private_key")
-                .and_then(|r| {
+        if private_key_b64.is_empty() {
+            match cmix.ekv_get("rpc_server_private_key") {
+                Ok(r) => {
                     private_key = r;
                     tracing::info!("Loaded Private Key From EKV...");
-                })
-                .or_else(|| {
+                }
+                Err(_) => {
                     private_key = rpc::generate_random_key(&cmix)?;
                     tracing::info!("Generating Random Private Key...");
-                });
+                }
+            }
         } else {
             private_key = BASE64_STANDARD_NO_PAD
                 .decode(private_key_b64)
                 .map_err(|e| e.to_string())?;
             tracing::info!("Loaded Private Key From config...");
         }
-        let public_key = rpc::derive_public_key(&private_key);
+        let public_key = rpc::derive_public_key(&private_key)?;
         let public_key_b64 = BASE64_STANDARD_NO_PAD.encode(public_key);
         tracing::info!("RPC Public Key: {public_key_b64}");
         cmix.ekv_set("rpc_server_private_key", &private_key)?;
 
         let runtime = tokio::runtime::Handle::current();
         let (sender, mut response_queue) = mpsc::channel(256);
-        let cbs_pubkey_lock = Arc::new(OnceLock::new());
-        let cbs = Arc::new(CMixServerCallbacks {
+        let cbs = CMixServerCallbacks {
             router,
             runtime,
             response_queue: sender,
-            server_pubkey: cbs_pubkey_lock.clone(),
-        });
+        };
+
         tracing::info!("Spawning RPC server");
-        let rpc_server = rpc::new_server(&cmix, request_callback, reception_id, private_key);
+        base::callbacks::set_rpc_callbacks();
+        let rpc_server = rpc::new_server(&cmix, cbs, reception_id, private_key)?;
 
         let cmix = Arc::new(cmix);
         tokio::task::spawn_blocking({
@@ -217,191 +211,59 @@ impl CMixServer {
             tokio::time::sleep(Duration::from_secs(1)).await;
         }
 
-        let token = dm.get_token()?;
-        let pubkey = dm.get_dm_pubkey()?;
-        let pubkey_display = BASE64_STANDARD_NO_PAD.encode(&pubkey);
-        tracing::info!("DMTOKEN: {}", token as u32);
-        tracing::info!("DMPUBKEY: {pubkey_display}");
+        rpc_server.start();
 
-        // This shouldn't block, and should return Ok, since it's the only place where this cell is
-        // initialized.
-        cbs_pubkey_lock.set(pubkey).unwrap();
-
-        let dm = Arc::new(dm);
-
-        tracing::debug!("Listening for messages");
         while let Some(resp) = response_queue.recv().await {
-            let dm = dm.clone();
             tokio::spawn(async move {
-                tracing::debug!("Sending response");
-                for window in resp.text.chunks(750) {
-                    if let Err(e) =
-                        dm.send(&resp.partner_pubkey, resp.partner_token, 0, window, 0, &[])
-                    {
-                        tracing::warn!(error = e, "Error sending response");
-                        break;
-                    }
-
-                    tokio::time::sleep(Duration::from_secs(4)).await;
-                }
+                tracing::debug!("request received, sending response");
+                tracing::debug!("{:?}", resp.text);
             });
         }
 
+        rpc_server.stop();
         cmix.stop_network_follower()
     }
 }
 
 struct CMixServerCallbacks<T> {
     router: Router<T>,
-    server_pubkey: Arc<OnceLock<Vec<u8>>>,
     runtime: tokio::runtime::Handle,
     response_queue: mpsc::Sender<Response>,
 }
 
-impl<T> CMixServerCallbacks<T>
+impl<T> rpc::ServerCallback for CMixServerCallbacks<T>
 where
     T: Send + Sync + 'static,
 {
-    fn serve_req(&self, text: &[u8], sender_key: &[u8], dm_token: i32, timestamp: i64) {
-        if sender_key != self.server_pubkey.get().unwrap() {
-            let mut router = self.router.clone();
-            let req = IncomingRequest {
-                text: text.into(),
-                sender_key: sender_key.into(),
-                dm_token,
-                timestamp,
-            };
-            let response_queue = self.response_queue.clone();
-            let sender_key = Vec::from(sender_key);
-            self.runtime.spawn(async move {
-                tracing::debug!("Evaluating router on request");
-                if poll_fn(|cx| router.poll_ready(cx)).await.is_ok() {
-                    match router.call(req).await {
-                        Err(e) => {
-                            tracing::warn!(error = e, "Error in servicing request");
-                        }
-                        Ok(resp) => {
-                            if response_queue
-                                .send(Response {
-                                    text: resp,
-                                    partner_pubkey: sender_key,
-                                    partner_token: dm_token,
-                                })
-                                .await
-                                .is_err()
-                            {
-                                tracing::warn!(partner_token = dm_token, "Error queuing response");
-                            }
-                        }
+    fn serve_req(&self, sender_id: Vec<u8>, request: Vec<u8>) -> Vec<u8> {
+        let mut router = self.router.clone();
+        let response_queue = self.response_queue.clone();
+        let req = IncomingRequest { sender_id, request };
+        let r = self.runtime.block_on(async {
+            let ret: Vec<u8>;
+            tracing::debug!("Evaluating router on request");
+            if poll_fn(|cx| router.poll_ready(cx)).await.is_ok() {
+                match router.call(req).await {
+                    Err(e) => {
+                        tracing::warn!(error = e, "Error in servicing request");
+                        ret = e.into_bytes();
+                    }
+                    Ok(resp) => {
+                        if response_queue
+                            .send(Response { text: resp.clone() })
+                            .await
+                            .is_err()
+                        {
+                            tracing::warn!("couldn't send to queue");
+                        };
+                        ret = resp;
                     }
                 }
-            });
-        }
+            } else {
+                ret = String::from("error unable to service request").into_bytes();
+            }
+            ret
+        });
+        return r;
     }
-}
-
-impl<T> callbacks::DmCallbacks for CMixServerCallbacks<T>
-where
-    T: Send + Sync + 'static,
-{
-    fn receive(
-        &self,
-        _message_id: &[u8],
-        _nickname: &str,
-        text: &[u8],
-        _partner_key: &[u8],
-        sender_key: &[u8],
-        dm_token: i32,
-        _codeset: i32,
-        timestamp: i64,
-        _round_id: i64,
-        _message_type: i64,
-        _status: i64,
-    ) -> i64 {
-        tracing::debug!(dm_token, "Received raw");
-        self.serve_req(text, sender_key, dm_token, timestamp);
-        0
-    }
-
-    fn receive_text(
-        &self,
-        _message_id: &[u8],
-        _nickname: &str,
-        text: &str,
-        _partner_key: &[u8],
-        sender_key: &[u8],
-        dm_token: i32,
-        _codeset: i32,
-        timestamp: i64,
-        _round_id: i64,
-        _status: i64,
-    ) -> i64 {
-        tracing::debug!(dm_token, "Received text");
-        self.serve_req(text.as_bytes(), sender_key, dm_token, timestamp);
-        0
-    }
-
-    fn receive_reply(
-        &self,
-        _message_id: &[u8],
-        _reply_to: &[u8],
-        _nickname: &str,
-        _text: &str,
-        _partner_key: &[u8],
-        _sender_key: &[u8],
-        dm_token: i32,
-        _codeset: i32,
-        _timestamp: i64,
-        _round_id: i64,
-        _status: i64,
-    ) -> i64 {
-        tracing::debug!(dm_token, "Received reply");
-        0
-    }
-
-    fn receive_reaction(
-        &self,
-        _message_id: &[u8],
-        _reaction_to: &[u8],
-        _nickname: &str,
-        _text: &str,
-        _partner_key: &[u8],
-        _sender_key: &[u8],
-        dm_token: i32,
-        _codeset: i32,
-        _timestamp: i64,
-        _round_id: i64,
-        _status: i64,
-    ) -> i64 {
-        tracing::debug!(dm_token, "Received reaction");
-        0
-    }
-
-    fn update_sent_status(
-        &self,
-        _uuid: i64,
-        _message_id: &[u8],
-        _timestamp: i64,
-        _round_id: i64,
-        _status: i64,
-    ) {
-    }
-
-    fn block_sender(&self, _pubkey: &[u8]) {}
-
-    fn unblock_sender(&self, _pubkey: &[u8]) {}
-
-    fn get_conversation(&self, _pubkey: &[u8]) -> Vec<u8> {
-        vec![]
-    }
-
-    fn get_conversations(&self) -> Vec<u8> {
-        vec![]
-    }
-
-    fn delete_message(&self, _message_id: &[u8], _pubkey: &[u8]) -> bool {
-        false
-    }
-
-    fn event_update(&self, _event_type: i64, _json_data: &[u8]) {}
 }

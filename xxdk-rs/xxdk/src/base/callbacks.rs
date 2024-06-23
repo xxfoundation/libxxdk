@@ -477,15 +477,14 @@ extern "C" fn event_update_cb(
 
 // RPC Callback functions
 
-#[derive(Debug)]
 pub struct RpcResponse {
     pub(crate) instance_id: i32,
-    pub response_fn: Option<&'static fn(Vec<u8>) -> ()>,
-    pub error_fn: Option<&'static fn(Vec<u8>) -> ()>,
+    pub response_fn: Option<Box<dyn Fn(Vec<u8>)>>,
+    pub error_fn: Option<Box<dyn Fn(Vec<u8>)>>,
 }
 
 impl RpcResponse {
-    pub fn callback(&mut self, response_fn: &'static fn(Vec<u8>), err_fn: &'static fn(Vec<u8>)) {
+    pub fn callback(&mut self, response_fn: Box<dyn Fn(Vec<u8>)>, err_fn: Box<dyn Fn(Vec<u8>)>) {
         self.response_fn = Some(response_fn);
         self.error_fn = Some(err_fn);
         let ptr: *mut c_void = self as *mut _ as *mut c_void;
@@ -508,7 +507,7 @@ extern "C" fn cmix_rpc_send_response_cb(
         let r = response as *const u8;
         let rs = response_len as usize;
         let response = clone_bytes_from_raw_parts(r, rs);
-        let rfn = (*rpc_obj).response_fn.unwrap() as &fn(Vec<u8>);
+        let rfn = (*rpc_obj).response_fn.as_ref().unwrap();
         rfn(response);
     }
 }
@@ -519,14 +518,13 @@ extern "C" fn cmix_rpc_send_error_cb(target: *mut c_void, err: *mut c_void, err_
         let e = err as *const u8;
         let es = err_len as usize;
         let response = clone_bytes_from_raw_parts(e, es);
-        let efn = (*rpc_obj).error_fn.unwrap() as &fn(Vec<u8>);
+        let efn = (*rpc_obj).error_fn.as_ref().unwrap();
         efn(response);
     }
 }
 
-#[derive(Debug)]
-pub struct RpcServerRequest {
-    pub request_fn: fn(Vec<u8>, Vec<u8>) -> Vec<u8>,
+pub struct RpcServerRequestHandler {
+    pub request_fn: Box<dyn Fn(Vec<u8>, Vec<u8>) -> Vec<u8>>,
 }
 
 extern "C" fn cmix_rpc_server_cb(
@@ -537,14 +535,14 @@ extern "C" fn cmix_rpc_server_cb(
     request_len: c_int,
 ) -> GoByteSlice {
     unsafe {
-        let rpc_obj = &mut *(target as *mut RpcServerRequest);
+        let rpc_obj = &mut *(target as *mut RpcServerRequestHandler);
         let s = sender as *const u8;
         let ss = sender_len as usize;
         let sndr = clone_bytes_from_raw_parts(s, ss);
         let r = request as *const u8;
         let rs = request_len as usize;
         let req = clone_bytes_from_raw_parts(r, rs);
-        let sfn = rpc_obj.request_fn;
+        let sfn = &rpc_obj.request_fn;
         let res = sfn(sndr, req);
         return clone_bytes_into_c_buffer(&res);
     }
