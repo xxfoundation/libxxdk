@@ -6,6 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+base64 = "0.22.1"
 lazy_static = "1.4.0"
 libc = "0.2.153"
+serde = { version = "1.0.202", features = ["derive"] }
+serde_json = "1.0.117"
+tokio = { version = "1.37.0", features = ["rt", "fs", "sync", "time"] }
+tower = "0.4.13"
+tracing = "0.1.40"
 xxdk-sys = { version = "0.1.0", path = "../xxdk-sys" }
