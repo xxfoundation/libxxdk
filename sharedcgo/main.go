@@ -571,6 +571,13 @@ func cmix_rpc_generate_random_rpc_key(cMixID int32) (C.GoByteSlice, C.GoError) {
 	return makeBytes(i), makeError(err)
 }
 
+//export cmix_rpc_derive_rpc_public_key
+func cmix_rpc_derive_rpc_public_key(private_key []byte) (
+	C.GoByteSlice, C.GoError) {
+	i, err := bindings.DeriveRPCPublicKey(private_key)
+	return makeBytes(i), makeError(err)
+}
+
 //export cmix_rpc_new_server
 func cmix_rpc_new_server(cMixID int32, callbackObj unsafe.Pointer,
 	reception_id, private_key []byte) (int32, C.GoError) {
