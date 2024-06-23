@@ -565,14 +565,14 @@ func cmix_rpc_generate_reception_id(cMixID int32) (C.GoByteSlice, C.GoError) {
 	return makeBytes(i), makeError(err)
 }
 
-//export cmix_rpc_generate_random_rpc_key
-func cmix_rpc_generate_random_rpc_key(cMixID int32) (C.GoByteSlice, C.GoError) {
+//export cmix_rpc_generate_random_key
+func cmix_rpc_generate_random_key(cMixID int32) (C.GoByteSlice, C.GoError) {
 	i, err := bindings.GenerateRandomRPCKey(int(cMixID))
 	return makeBytes(i), makeError(err)
 }
 
-//export cmix_rpc_derive_rpc_public_key
-func cmix_rpc_derive_rpc_public_key(private_key []byte) (
+//export cmix_rpc_derive_public_key
+func cmix_rpc_derive_public_key(private_key []byte) (
 	C.GoByteSlice, C.GoError) {
 	i, err := bindings.DeriveRPCPublicKey(private_key)
 	return makeBytes(i), makeError(err)

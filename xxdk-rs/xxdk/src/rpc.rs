@@ -43,11 +43,21 @@ pub fn generate_reception_id(net: &CMix) -> Result<Vec<u8>, String> {
     }
 }
 
-pub fn generate_random_rpc_key(net: &CMix) -> Result<Vec<u8>, String> {
+pub fn generate_random_key(net: &CMix) -> Result<Vec<u8>, String> {
     unsafe {
-        let cmix_rpc_generate_random_rpc_key_return { r0, r1 } =
-            cmix_rpc_generate_random_rpc_key(net.cmix_instance);
+        let cmix_rpc_generate_random_key_return { r0, r1 } =
+            cmix_rpc_generate_random_key(net.cmix_instance);
         go_error_into_result(|| c_byte_slice_into_vec(r0), r1)
+    }
+}
+
+pub fn derive_public_key(private_key: &[u8]) -> Result<Vec<u8>, String> {
+    unsafe {
+        let prk = bytes_as_go_slice(&private_key);
+        unsafe {
+            let cmix_rpc_derive_public_key_return { r0, r1 } = cmix_rpc_derive_public_key(prk);
+            go_error_into_result(|| c_byte_slice_into_vec(r0), r1)
+        }
     }
 }
 

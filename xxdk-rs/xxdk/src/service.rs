@@ -1,6 +1,3 @@
-use crate::base::callbacks;
-use crate::base::{self, generate_codename_identity};
-
 use std::future::{poll_fn, Future};
 use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
@@ -11,6 +8,9 @@ use base64::prelude::*;
 use serde::Deserialize;
 use tokio::sync::mpsc;
 use tower::Service;
+
+use crate::base;
+use crate::rpc;
 
 const DM_ID_EKV_KEY: &str = "MyDMID";
 
@@ -101,6 +101,8 @@ pub struct CMixServerConfig {
     pub ndf_path: String,
     pub storage_dir: String,
     pub secret: String,
+    pub reception_id: String,
+    pub private_key: String,
 }
 
 #[derive(Debug)]
@@ -136,12 +138,52 @@ impl CMixServer {
         .await
         .map_err(|e| e.to_string())??;
 
-        let dm_id = cmix.ekv_get(DM_ID_EKV_KEY).or_else(|_| {
-            tracing::info!("Generating DM ID");
-            let id = generate_codename_identity(&config.secret);
-            cmix.ekv_set(DM_ID_EKV_KEY, &id)?;
-            Ok::<_, String>(id)
-        })?;
+        // Reception ID Load or Generate
+        let reception_id_b64 = config.secret.clone();
+        let reception_id: Vec<u8>;
+        if reception_id_b64.len() == 0 {
+            cmix.ekv_get("rpc_server_reception_id")
+                .and_then(|r| {
+                    reception_id = r;
+                    tracing::info!("Loaded Reception ID From EKV...");
+                })
+                .or_else(|| {
+                    reception_id = rpc::generate_reception_id(&cmix)?;
+                    tracing::info!("Generating Random Reception ID...");
+                });
+        } else {
+            reception_id = BASE64_STANDARD_NO_PAD
+                .decode(reception_id_b64)
+                .map_err(|e| e.to_string())?;
+            tracing::info!("Loaded Reception ID From config...");
+        }
+        reception_id_b64 = BASE64_STANDARD_NO_PAD.encode(reception_id);
+        tracing::info!("RPC Reception ID: {reception_id_b64}");
+        cmix.ekv_set("rpc_server_reception_id", &reception_id)?;
+
+        // Private Key Load or Generate
+        let private_key_b64 = config.secret.clone();
+        let private_key: Vec<u8>;
+        if private_key_b64.len() == 0 {
+            cmix.ekv_get("rpc_server_private_key")
+                .and_then(|r| {
+                    private_key = r;
+                    tracing::info!("Loaded Private Key From EKV...");
+                })
+                .or_else(|| {
+                    private_key = rpc::generate_random_key(&cmix)?;
+                    tracing::info!("Generating Random Private Key...");
+                });
+        } else {
+            private_key = BASE64_STANDARD_NO_PAD
+                .decode(private_key_b64)
+                .map_err(|e| e.to_string())?;
+            tracing::info!("Loaded Private Key From config...");
+        }
+        let public_key = rpc::derive_public_key(&private_key);
+        let public_key_b64 = BASE64_STANDARD_NO_PAD.encode(public_key);
+        tracing::info!("RPC Public Key: {public_key_b64}");
+        cmix.ekv_set("rpc_server_private_key", &private_key)?;
 
         let runtime = tokio::runtime::Handle::current();
         let (sender, mut response_queue) = mpsc::channel(256);
@@ -152,8 +194,8 @@ impl CMixServer {
             response_queue: sender,
             server_pubkey: cbs_pubkey_lock.clone(),
         });
-        tracing::info!("Spawning DM client");
-        let dm = cmix.new_dm_client(&dm_id, &config.secret, cbs)?;
+        tracing::info!("Spawning RPC server");
+        let rpc_server = rpc::new_server(&cmix, request_callback, reception_id, private_key);
 
         let cmix = Arc::new(cmix);
         tokio::task::spawn_blocking({
