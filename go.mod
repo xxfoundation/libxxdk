@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/jwalterweatherman v1.1.0
-	gitlab.com/elixxir/client/v4 v4.7.3-0.20240623004227-7626dc4218ca
+	gitlab.com/elixxir/client/v4 v4.7.3-0.20240624180030-a0bf2bbb9de2
 	gitlab.com/elixxir/crypto v0.0.9
 	gitlab.com/xx_network/crypto v0.0.6
 )
