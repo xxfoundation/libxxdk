@@ -558,6 +558,10 @@ extern "C" fn cmix_rpc_server_cb(
         let req = clone_bytes_from_raw_parts(r, rs);
         let sfn = &rpc_obj.request_fn;
         let res = sfn(sndr, req);
+        tracing::error!(
+            "cmix_rpc_sevrver_cb response: {}",
+            String::from_utf8_lossy(&res)
+        );
         clone_bytes_into_c_buffer(&res)
     }
 }

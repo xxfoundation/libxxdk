@@ -234,7 +234,7 @@ impl CMixServer {
         while let Some(resp) = response_queue.recv().await {
             tokio::spawn(async move {
                 tracing::debug!("request received, sending response");
-                tracing::debug!("{:?}", resp.text);
+                tracing::debug!("{}", String::from_utf8_lossy(&resp.text));
             });
         }
 
