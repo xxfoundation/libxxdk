@@ -243,6 +243,8 @@ impl CMixServer {
     }
 }
 
+unsafe impl Send for CMixServer {}
+
 struct CMixServerCallbacks<T> {
     router: Router<T>,
     runtime: tokio::runtime::Handle,
