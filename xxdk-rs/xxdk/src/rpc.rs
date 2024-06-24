@@ -66,7 +66,7 @@ pub trait ServerCallback {
 pub struct Server {
     pub(crate) instance_id: i32,
     #[allow(dead_code)]
-    pub(crate) cb: RpcServerRequestHandler,
+    pub(crate) cb: *mut RpcServerRequestHandler,
 }
 
 pub fn new_server<T: ServerCallback + 'static>(
@@ -77,13 +77,18 @@ pub fn new_server<T: ServerCallback + 'static>(
 ) -> Result<Server, String> {
     // This is absolutely unsafe to leave mutable without synchronization; I don't think it *needs*
     // to be mutable though. Investigate later
-    let mut cb = RpcServerRequestHandler {
+    let srh = Box::new(RpcServerRequestHandler {
         request_fn: Box::new(move |sender_id: Vec<u8>, request: Vec<u8>| -> Vec<u8> {
+            tracing::debug!("inside RpceServerRequestHandler closure");
             return request_callback.serve_req(sender_id, request);
         }),
-    };
+        name: String::from("new_server"),
+    });
+    let cb = Box::into_raw(srh);
     unsafe {
-        let cb_obj: *mut c_void = &mut cb as *mut _ as *mut c_void;
+        tracing::debug!("new_server cb name: {}", (*cb).name);
+        let cb_obj = cb as *const _ as *const c_void as usize;
+        tracing::debug!("new_server cb_obj {:#x}", cb_obj as usize);
         let cmix_rpc_new_server_return { r0, r1 } = cmix_rpc_new_server(
             net.cmix_instance,
             cb_obj,
@@ -104,13 +109,18 @@ pub fn load_server<T: ServerCallback + 'static>(
     net: &CMix,
     request_callback: T,
 ) -> Result<Server, String> {
-    let mut cb = RpcServerRequestHandler {
+    let srh = Box::new(RpcServerRequestHandler {
         request_fn: Box::new(move |sender_id: Vec<u8>, request: Vec<u8>| -> Vec<u8> {
+            tracing::debug!("inside RpceServerRequestHandler closure");
             return request_callback.serve_req(sender_id, request);
         }),
-    };
+        name: String::from("load_server"),
+    });
+    let cb = Box::into_raw(srh);
     unsafe {
-        let cb_obj: *mut c_void = &mut cb as *mut _ as *mut c_void;
+        tracing::debug!("load_server cb name: {}", (*cb).name);
+        let cb_obj = cb as *const _ as *const c_void as usize;
+        tracing::debug!("load_server cb_obj {:#x}", cb_obj);
         let cmix_rpc_load_server_return { r0, r1 } =
             cmix_rpc_load_server(net.cmix_instance, cb_obj);
         go_error_into_result(

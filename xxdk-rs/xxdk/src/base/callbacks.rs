@@ -5,6 +5,7 @@
 // length.
 #![allow(clippy::unnecessary_cast)]
 
+use base64::prelude::*;
 use std::collections::HashMap;
 use std::os::raw::{c_char, c_int, c_long, c_void};
 use std::sync::{Arc, RwLock};
@@ -487,7 +488,7 @@ impl RpcResponse {
     pub fn callback(&mut self, response_fn: Box<dyn Fn(Vec<u8>)>, err_fn: Box<dyn Fn(Vec<u8>)>) {
         self.response_fn = Some(response_fn);
         self.error_fn = Some(err_fn);
-        let ptr: *mut c_void = self as *mut _ as *mut c_void;
+        let ptr = self as *mut _ as *mut c_void as usize;
         unsafe { cmix_rpc_send_callback(self.instance_id, ptr) }
     }
     pub fn wait(&self) {
@@ -502,6 +503,7 @@ extern "C" fn cmix_rpc_send_response_cb(
     response: *mut c_void,
     response_len: c_int,
 ) {
+    tracing::debug!("cmix_rpc_send_response_cb");
     unsafe {
         let rpc_obj = &mut *(target as *mut RpcResponse);
         let r = response as *const u8;
@@ -513,6 +515,7 @@ extern "C" fn cmix_rpc_send_response_cb(
 }
 
 extern "C" fn cmix_rpc_send_error_cb(target: *mut c_void, err: *mut c_void, err_len: c_int) {
+    tracing::debug!("cmix_rpc_send_error_cb");
     unsafe {
         let rpc_obj = &mut *(target as *mut RpcResponse);
         let e = err as *const u8;
@@ -524,6 +527,7 @@ extern "C" fn cmix_rpc_send_error_cb(target: *mut c_void, err: *mut c_void, err_
 }
 
 pub struct RpcServerRequestHandler {
+    pub name: String,
     pub request_fn: Box<dyn Fn(Vec<u8>, Vec<u8>) -> Vec<u8>>,
 }
 
@@ -534,21 +538,37 @@ extern "C" fn cmix_rpc_server_cb(
     request: *mut c_void,
     request_len: c_int,
 ) -> GoByteSlice {
+    tracing::debug!("cmix_rpc_server_cb");
     unsafe {
-        let rpc_obj = &mut *(target as *mut RpcServerRequestHandler);
+        tracing::debug!("cmix_rpc_server_cb conversion {:#x}", target as usize);
+        let rpc_obj: &mut RpcServerRequestHandler = &mut *(target as *mut RpcServerRequestHandler);
+        tracing::debug!("cmix_rpc_server_cb post conversion");
+        tracing::debug!("ok now we try to print");
+        tracing::debug!("cmix_rpc_server_cb post conversion name: {}", rpc_obj.name);
         let s = sender as *const u8;
         let ss = sender_len as usize;
         let sndr = clone_bytes_from_raw_parts(s, ss);
         let r = request as *const u8;
         let rs = request_len as usize;
         let req = clone_bytes_from_raw_parts(r, rs);
+        tracing::debug!("ok now we try to print again");
+        tracing::debug!(
+            "cmix_rpc_server_cb(sender: {}, request: {})",
+            BASE64_STANDARD_NO_PAD.encode(sndr.as_slice()),
+            String::from_utf8_lossy(req.as_slice())
+        );
+
         let sfn = &rpc_obj.request_fn;
+        tracing::debug!("cmix_rpc_server_cb function");
         let res = sfn(sndr, req);
+        tracing::debug!("cmix_rpc_server_cb return");
         return clone_bytes_into_c_buffer(&res);
     }
 }
 
 pub fn set_rpc_callbacks() {
+    tracing::debug!("set_rpc_callbacks");
+
     unsafe {
         register_cmix_rpc_send_callbacks(
             Some(cmix_rpc_send_response_cb),

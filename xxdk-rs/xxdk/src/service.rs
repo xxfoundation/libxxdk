@@ -131,7 +131,7 @@ impl CMixServer {
         .map_err(|e| e.to_string())??;
 
         // Reception ID Load or Generate
-        let mut reception_id_b64 = config.secret.clone();
+        let mut reception_id_b64 = config.reception_id.clone();
         let reception_id: Vec<u8>;
         if reception_id_b64.is_empty() {
             match cmix.ekv_get("rpc_server_reception_id") {
@@ -140,22 +140,27 @@ impl CMixServer {
                     reception_id = r;
                 }
                 Err(_) => {
-                    reception_id = rpc::generate_reception_id(&cmix)?;
                     tracing::info!("Generating Random Reception ID...");
+                    reception_id = rpc::generate_reception_id(&cmix)?;
                 }
             }
         } else {
-            reception_id = BASE64_STANDARD_NO_PAD
-                .decode(reception_id_b64)
-                .map_err(|e| e.to_string())?;
-            tracing::info!("Loaded Reception ID From config...");
+            match BASE64_STANDARD_NO_PAD.decode(reception_id_b64) {
+                Ok(r) => {
+                    tracing::info!("Loaded Reception ID From config...");
+                    reception_id = r;
+                }
+                Err(e) => {
+                    panic!("{}", e);
+                }
+            }
         }
         reception_id_b64 = BASE64_STANDARD_NO_PAD.encode(&reception_id);
         tracing::info!("RPC Reception ID: {reception_id_b64}");
         cmix.ekv_set("rpc_server_reception_id", &reception_id)?;
 
         // Private Key Load or Generate
-        let private_key_b64 = config.secret.clone();
+        let private_key_b64 = config.private_key.clone();
         let private_key: Vec<u8>;
         if private_key_b64.is_empty() {
             match cmix.ekv_get("rpc_server_private_key") {
@@ -169,10 +174,15 @@ impl CMixServer {
                 }
             }
         } else {
-            private_key = BASE64_STANDARD_NO_PAD
-                .decode(private_key_b64)
-                .map_err(|e| e.to_string())?;
-            tracing::info!("Loaded Private Key From config...");
+            match BASE64_STANDARD_NO_PAD.decode(private_key_b64) {
+                Ok(r) => {
+                    tracing::info!("Loaded Private Key From config...");
+                    private_key = r;
+                }
+                Err(e) => {
+                    panic!("{}", e);
+                }
+            }
         }
         let public_key = rpc::derive_public_key(&private_key)?;
         let public_key_b64 = BASE64_STANDARD_NO_PAD.encode(public_key);
@@ -213,6 +223,14 @@ impl CMixServer {
 
         rpc_server.start();
 
+        tracing::info!(
+            "RPC Server CB PTR: {:#x}",
+            rpc_server.cb as *const _ as *const libc::c_void as usize
+        );
+        tracing::info!("RPC Server Started");
+        tracing::info!("RPC Public Key: {public_key_b64}");
+        tracing::info!("RPC Reception ID: {reception_id_b64}");
+
         while let Some(resp) = response_queue.recv().await {
             tokio::spawn(async move {
                 tracing::debug!("request received, sending response");
@@ -220,7 +238,7 @@ impl CMixServer {
             });
         }
 
-        rpc_server.stop();
+        // rpc_server.stop();
         cmix.stop_network_follower()
     }
 }
