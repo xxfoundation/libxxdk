@@ -538,6 +538,8 @@ pub struct RpcServerRequestHandler {
     pub request_fn: Box<dyn Fn(Vec<u8>, Vec<u8>) -> Vec<u8>>,
 }
 
+unsafe impl Send for RpcServerRequestHandler {}
+
 extern "C" fn cmix_rpc_server_cb(
     target: *mut c_void,
     sender: *mut c_void,
