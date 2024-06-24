@@ -146,3 +146,5 @@ impl Server {
         }
     }
 }
+
+unsafe impl Send for Server {}
