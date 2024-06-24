@@ -255,6 +255,7 @@ impl<T> rpc::ServerCallback for CMixServerCallbacks<T>
 where
     T: Send + Sync + 'static,
 {
+    #[tracing::instrument(level = "debug", skip(self))]
     fn serve_req(&self, sender_id: Vec<u8>, request: Vec<u8>) -> Vec<u8> {
         let mut router = self.router.clone();
         let response_queue = self.response_queue.clone();
@@ -284,6 +285,7 @@ where
             }
             ret
         });
+        tracing::warn!("sending response: {}", String::from_utf8_lossy(&r));
         return r;
     }
 }
