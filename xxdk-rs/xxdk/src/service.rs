@@ -1,6 +1,7 @@
 use base64::prelude::*;
 use serde::Deserialize;
-use std::future::{poll_fn, Future};
+use std::collections::HashMap;
+use std::future::{self, poll_fn, Future};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Poll;
@@ -44,28 +45,37 @@ where
 }
 
 pub struct Router<T> {
-    handler: Arc<HandlerFnInner<T>>,
+    handlers: HashMap<String, Arc<HandlerFnInner<T>>>,
     state: Arc<T>,
 }
 
+// Manual implementation to avoid derive putting a Clone bound on T
 impl<T> Clone for Router<T> {
     fn clone(&self) -> Self {
         Self {
-            handler: self.handler.clone(),
+            handlers: self.handlers.clone(),
             state: self.state.clone(),
         }
     }
 }
 
 impl<T> Router<T> {
-    pub fn new<F>(handler: F, state: Arc<T>) -> Self
+    pub fn new(state: Arc<T>) -> Self {
+        Self {
+            handlers: HashMap::new(),
+            state,
+        }
+    }
+
+    pub fn route<F>(mut self, endpoint: &str, handler: F) -> Self
     where
         F: HandlerFn<T>,
     {
-        Self {
-            handler: Arc::new(move |state, req| Box::pin(handler(state, req))),
-            state,
-        }
+        self.handlers.insert(
+            endpoint.to_string(),
+            Arc::new(move |state, req| Box::pin(handler(state, req))),
+        );
+        self
     }
 }
 
@@ -84,7 +94,38 @@ where
     }
 
     fn call(&mut self, req: IncomingRequest) -> Self::Future {
-        (self.handler)(self.state.clone(), req)
+        // TODO All this manual matching on Results is gross, see if we can find a cleaner way to
+        // do this
+        let separator_idx = match req
+            .request
+            .iter()
+            .position(|b| *b == b',')
+            .ok_or_else(|| "no endpoint in request".to_string())
+        {
+            Ok(idx) => idx,
+            Err(e) => return Box::pin(future::ready(Err(e))),
+        };
+        let (endpoint, request) = req.request.split_at(separator_idx);
+
+        let endpoint =
+            match std::str::from_utf8(endpoint).map_err(|e| format!("non-UTF-8 endpoint ({e})")) {
+                Ok(endpoint) => endpoint,
+                Err(e) => return Box::pin(future::ready(Err(e))),
+            };
+
+        if let Some(handler) = self.handlers.get(endpoint) {
+            let (_, request) = request.split_first().unwrap();
+            let req = IncomingRequest {
+                request: request.into(),
+                sender_id: req.sender_id,
+            };
+
+            handler(self.state.clone(), req)
+        } else {
+            Box::pin(future::ready(Err(format!(
+                "unrecognized endpoint `{endpoint}`"
+            ))))
+        }
     }
 }
 

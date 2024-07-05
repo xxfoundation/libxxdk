@@ -1,4 +1,5 @@
-fn main() {
+#[tokio::main]
+async fn main() {
     // construct a subscriber that prints formatted traces to stdout
     let subscriber = tracing_subscriber::fmt()
         // Use a more compact, abbreviated log format
@@ -16,7 +17,7 @@ fn main() {
         .finish();
     // use that subscriber to process traces emitted after this point
     let _ = tracing::subscriber::set_global_default(subscriber);
-    if let Err(err) = rpc_example::run() {
+    if let Err(err) = rpc_example::run().await {
         eprintln!("Error: {err}");
         std::process::exit(-1);
     }

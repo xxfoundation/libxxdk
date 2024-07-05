@@ -75,8 +75,6 @@ pub fn new_server<T: ServerCallback + 'static>(
     reception_id: Vec<u8>,
     private_key: Vec<u8>,
 ) -> Result<Server, String> {
-    // This is absolutely unsafe to leave mutable without synchronization; I don't think it *needs*
-    // to be mutable though. Investigate later
     let srh = Box::new(RpcServerRequestHandler {
         request_fn: Box::new(move |sender_id: Vec<u8>, request: Vec<u8>| -> Vec<u8> {
             tracing::debug!("inside RpceServerRequestHandler closure");
