@@ -535,6 +535,7 @@ extern "C" fn cmix_rpc_send_error_cb(target: *mut c_void, err: *mut c_void, err_
 
 pub struct RpcServerRequestHandler {
     pub name: String,
+    #[allow(clippy::type_complexity)]
     pub request_fn: Box<dyn Fn(Vec<u8>, Vec<u8>) -> Vec<u8>>,
 }
 

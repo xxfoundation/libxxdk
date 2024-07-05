@@ -22,16 +22,14 @@ pub fn send(
             bytes_as_go_slice(pubkey),
             bytes_as_go_slice(request),
         );
-        return go_error_into_result(
-            || {
-                return RpcResponse {
-                    instance_id: r0,
-                    response_fn: None,
-                    error_fn: None,
-                };
+        go_error_into_result(
+            || RpcResponse {
+                instance_id: r0,
+                response_fn: None,
+                error_fn: None,
             },
             r1,
-        );
+        )
     }
 }
 
@@ -53,7 +51,7 @@ pub fn generate_random_key(net: &CMix) -> Result<Vec<u8>, String> {
 
 pub fn derive_public_key(private_key: &[u8]) -> Result<Vec<u8>, String> {
     unsafe {
-        let prk = bytes_as_go_slice(&private_key);
+        let prk = bytes_as_go_slice(private_key);
         let cmix_rpc_derive_public_key_return { r0, r1 } = cmix_rpc_derive_public_key(prk);
         go_error_into_result(|| c_byte_slice_into_vec(r0), r1)
     }
@@ -78,7 +76,7 @@ pub fn new_server<T: ServerCallback + 'static>(
     let srh = Box::new(RpcServerRequestHandler {
         request_fn: Box::new(move |sender_id: Vec<u8>, request: Vec<u8>| -> Vec<u8> {
             tracing::debug!("inside RpceServerRequestHandler closure");
-            return request_callback.serve_req(sender_id, request);
+            request_callback.serve_req(sender_id, request)
         }),
         name: String::from("new_server"),
     });
@@ -86,7 +84,7 @@ pub fn new_server<T: ServerCallback + 'static>(
     unsafe {
         tracing::debug!("new_server cb name: {}", (*cb).name);
         let cb_obj = cb as *const _ as *const c_void as usize;
-        tracing::debug!("new_server cb_obj {:#x}", cb_obj as usize);
+        tracing::debug!("new_server cb_obj {:#x}", cb_obj);
         let cmix_rpc_new_server_return { r0, r1 } = cmix_rpc_new_server(
             net.cmix_instance,
             cb_obj,
@@ -110,7 +108,7 @@ pub fn load_server<T: ServerCallback + 'static>(
     let srh = Box::new(RpcServerRequestHandler {
         request_fn: Box::new(move |sender_id: Vec<u8>, request: Vec<u8>| -> Vec<u8> {
             tracing::debug!("inside RpceServerRequestHandler closure");
-            return request_callback.serve_req(sender_id, request);
+            request_callback.serve_req(sender_id, request)
         }),
         name: String::from("load_server"),
     });

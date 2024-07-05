@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -60,11 +61,10 @@ pub async fn run() -> Result<(), String> {
 }
 
 pub async fn xx_rpc_handler(_: Arc<CMix>, request: IncomingRequest) -> Result<Vec<u8>, String> {
-    let sender: String = request
-        .sender_id
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect();
+    let sender: String = request.sender_id.iter().fold(String::new(), |mut s, b| {
+        write!(s, "{b:02x}").unwrap();
+        s
+    });
     tracing::info!(sender, "Received message via cMix",);
     let text = String::from_utf8_lossy(&request.request);
 
