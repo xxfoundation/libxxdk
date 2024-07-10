@@ -5,7 +5,7 @@ use std::sync::Arc;
 use base64::prelude::*;
 use structopt::StructOpt;
 use xxdk::base::*;
-use xxdk::service::*;
+use xxdk::service::{CMixServerConfig, SenderId, Utf8Lossy};
 
 const SECRET: &str = "Hello";
 const REGISTRATION_CODE: &str = "";
@@ -56,17 +56,16 @@ pub async fn run() -> Result<(), String> {
         private_key: String::from(""),
     };
 
-    let xx_router = xxdk::service::Router::new(Arc::new(cmix)).route("demo", xx_rpc_handler);
-    CMixServer::serve(xx_router, cmix_config).await
+    let xx_router = xxdk::service::Router::with_state(Arc::new(cmix)).route("demo", xx_rpc_handler);
+    xxdk::service::serve(xx_router, cmix_config).await
 }
 
-pub async fn xx_rpc_handler(_: Arc<CMix>, request: IncomingRequest) -> Result<Vec<u8>, String> {
-    let sender: String = request.sender_id.iter().fold(String::new(), |mut s, b| {
+pub async fn xx_rpc_handler(id: SenderId, req: Utf8Lossy) -> String {
+    let sender: String = id.0.iter().fold(String::new(), |mut s, b| {
         write!(s, "{b:02x}").unwrap();
         s
     });
     tracing::info!(sender, "Received message via cMix",);
-    let text = String::from_utf8_lossy(&request.request);
-
-    Ok(format!("Hi from rust rpc example! Echoed message: {text}").into_bytes())
+    let text = req.0;
+    format!("Hi from rust rpc example! Echoed message: {text}")
 }
