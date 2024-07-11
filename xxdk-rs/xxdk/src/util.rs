@@ -1,4 +1,10 @@
+use std::future::Future;
+use std::pin::Pin;
+
 use xxdk_sys::{GoByteSlice, GoError, GoSlice, GoString};
+
+/// A pinned, boxed, type-erased future that is `Send` and `'static`.
+pub type PinnedFuture<T> = Pin<Box<dyn Future<Output = T> + Send + 'static>>;
 
 /// Copy the contents of a byte buffer into a Vec.
 ///

@@ -5,7 +5,8 @@ use std::sync::Arc;
 use base64::prelude::*;
 use structopt::StructOpt;
 use xxdk::base::*;
-use xxdk::service::{CMixServerConfig, SenderId, Utf8Lossy};
+use xxdk::rpc::extractor::{SenderId, Utf8Lossy};
+use xxdk::rpc::{self, RpcServerConfig};
 
 const SECRET: &str = "Hello";
 const REGISTRATION_CODE: &str = "";
@@ -48,7 +49,7 @@ pub async fn run() -> Result<(), String> {
         BASE64_STANDARD.encode(&reception_id)
     );
 
-    let cmix_config = CMixServerConfig {
+    let cmix_config = RpcServerConfig {
         ndf_path: String::from(options.ndf.to_str().unwrap()),
         storage_dir: options.state_dir,
         secret: String::from(SECRET),
@@ -56,8 +57,8 @@ pub async fn run() -> Result<(), String> {
         private_key: String::from(""),
     };
 
-    let xx_router = xxdk::service::Router::with_state(Arc::new(cmix)).route("demo", xx_rpc_handler);
-    xxdk::service::serve(xx_router, cmix_config).await
+    let xx_router = rpc::Router::with_state(Arc::new(cmix)).route("demo", xx_rpc_handler);
+    rpc::serve(xx_router, cmix_config).await
 }
 
 pub async fn xx_rpc_handler(id: SenderId, req: Utf8Lossy) -> String {
