@@ -4,9 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+default = [ "clang-sys/clang_10_0" ]
+static = [ "clang-sys/static" ]
+
 
 [dependencies]
 
 [build-dependencies]
-bindgen = "0.69.4"
+clang-sys = "1.8.1"
+bindgen = { version = "0.69.4", default-features = false }
 cgo = "0.3.0"
