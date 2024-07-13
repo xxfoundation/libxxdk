@@ -22,6 +22,7 @@ fn main() {
         .expect("Couldn't write bindings");
 
     println!("cargo:rustc-link-search=native=./target");
+    println!("cargo:rustc-link-lib=static=xxdk");
     println!("cargo:rustc-flags=-lresolv");
     #[cfg(target_os = "macos")]
     {
