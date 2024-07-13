@@ -6,6 +6,3 @@ members = [
   "xxdk-sys",
   "rpc-example",
 ]
-
-[features]
-static = ["xxdk-sys/static"]
