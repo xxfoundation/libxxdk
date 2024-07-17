@@ -85,7 +85,7 @@ impl CMix {
             tracing::debug!("new_server cb_obj {:p}", cb_obj);
             let cmix_rpc_new_server_return { r0, r1 } = cmix_rpc_new_server(
                 self.cmix_instance,
-                cb_obj as usize,
+                cb_obj as _,
                 bytes_as_go_slice(&reception_id),
                 bytes_as_go_slice(&private_key),
             );
@@ -113,7 +113,7 @@ impl CMix {
             let cb_obj = &*cb as *const _;
             tracing::debug!("load_server cb_obj {:p}", cb_obj);
             let cmix_rpc_load_server_return { r0, r1 } =
-                cmix_rpc_load_server(self.cmix_instance, cb_obj as usize);
+                cmix_rpc_load_server(self.cmix_instance, cb_obj as _);
             go_error_into_result(
                 || Server {
                     instance_id: r0,
@@ -158,7 +158,7 @@ impl RpcResponse {
         self.response_fn = Some(response_fn);
         self.error_fn = Some(err_fn);
         tracing::trace!("callback conversion {:p}", self);
-        unsafe { cmix_rpc_send_callback(self.instance_id, self as *const _ as usize) }
+        unsafe { cmix_rpc_send_callback(self.instance_id, self as *const _ as _) }
     }
     pub fn wait(&self) {
         unsafe {
