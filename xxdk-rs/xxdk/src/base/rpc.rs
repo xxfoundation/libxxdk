@@ -157,9 +157,8 @@ impl RpcResponse {
     pub fn callback(&mut self, response_fn: Box<dyn Fn(Vec<u8>)>, err_fn: Box<dyn Fn(Vec<u8>)>) {
         self.response_fn = Some(response_fn);
         self.error_fn = Some(err_fn);
-        let ptr = self as *mut _ as *mut c_void as usize;
-        tracing::trace!("callback conversion {:#x}", ptr);
-        unsafe { cmix_rpc_send_callback(self.instance_id, ptr) }
+        tracing::trace!("callback conversion {:p}", self);
+        unsafe { cmix_rpc_send_callback(self.instance_id, self as *const _ as usize) }
     }
     pub fn wait(&self) {
         unsafe {
@@ -175,10 +174,10 @@ extern "C" fn cmix_rpc_send_response_cb(
 ) {
     unsafe {
         tracing::trace!(
-            "cmix_rpc_send_response_cb conversion {:#x}",
-            target as usize
+            "cmix_rpc_send_response_cb conversion {:p}",
+            target,
         );
-        let rpc_obj = &mut *(target as *mut RpcResponse);
+        let rpc_obj = &*(target as *const RpcResponse);
         let r = response as *const u8;
         let rs = response_len as usize;
         let response = clone_bytes_from_raw_parts(r, rs);
@@ -189,8 +188,8 @@ extern "C" fn cmix_rpc_send_response_cb(
 
 extern "C" fn cmix_rpc_send_error_cb(target: *mut c_void, err: *mut c_void, err_len: c_int) {
     unsafe {
-        tracing::trace!("cmix_rpc_send_error_cb conversion {:#x}", target as usize);
-        let rpc_obj = &mut *(target as *mut RpcResponse);
+        tracing::trace!("cmix_rpc_send_error_cb conversion {:p}", target);
+        let rpc_obj = &*(target as *const RpcResponse);
         let e = err as *const u8;
         let es = err_len as usize;
         let response = clone_bytes_from_raw_parts(e, es);
@@ -214,8 +213,8 @@ extern "C" fn cmix_rpc_server_cb(
     request_len: c_int,
 ) -> GoByteSlice {
     unsafe {
-        tracing::trace!("cmix_rpc_server_cb conversion {:#x}", target as usize);
-        let rpc_obj: &mut RpcServerRequestHandler = &mut *(target as *mut RpcServerRequestHandler);
+        tracing::trace!("cmix_rpc_server_cb conversion {:p}", target);
+        let rpc_obj: &RpcServerRequestHandler = &*(target as *const RpcServerRequestHandler);
         let s = sender as *const u8;
         let ss = sender_len as usize;
         let sndr = clone_bytes_from_raw_parts(s, ss);
