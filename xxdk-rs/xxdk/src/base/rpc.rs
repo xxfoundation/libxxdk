@@ -1,5 +1,7 @@
 //! Safe wrappers around the FFI bindings to the RPC API.
 
+use std::pin::Pin;
+
 use libc::*;
 use xxdk_sys::*;
 
@@ -62,7 +64,7 @@ pub trait ServerCallback {
 pub struct Server {
     pub(crate) instance_id: i32,
     #[allow(dead_code)]
-    pub(crate) cb: *mut RpcServerRequestHandler,
+    pub(crate) cb: Pin<Box<RpcServerRequestHandler>>,
 }
 
 impl CMix {
@@ -72,21 +74,18 @@ impl CMix {
         reception_id: Vec<u8>,
         private_key: Vec<u8>,
     ) -> Result<Server, String> {
-        let srh = Box::new(RpcServerRequestHandler {
+        let cb = Box::pin(RpcServerRequestHandler {
             request_fn: Box::new(move |sender_id: Vec<u8>, request: Vec<u8>| -> Vec<u8> {
                 tracing::debug!("inside RpceServerRequestHandler closure");
                 request_callback.serve_req(sender_id, request)
             }),
-            name: String::from("new_server"),
         });
-        let cb = Box::into_raw(srh);
         unsafe {
-            tracing::debug!("new_server cb name: {}", (*cb).name);
-            let cb_obj = cb as *const _ as *const c_void as usize;
-            tracing::debug!("new_server cb_obj {:#x}", cb_obj);
+            let cb_obj = &*cb as *const _;
+            tracing::debug!("new_server cb_obj {:p}", cb_obj);
             let cmix_rpc_new_server_return { r0, r1 } = cmix_rpc_new_server(
                 self.cmix_instance,
-                cb_obj,
+                cb_obj as usize,
                 bytes_as_go_slice(&reception_id),
                 bytes_as_go_slice(&private_key),
             );
@@ -104,20 +103,17 @@ impl CMix {
         &self,
         request_callback: T,
     ) -> Result<Server, String> {
-        let srh = Box::new(RpcServerRequestHandler {
+        let cb = Box::pin(RpcServerRequestHandler {
             request_fn: Box::new(move |sender_id: Vec<u8>, request: Vec<u8>| -> Vec<u8> {
                 tracing::debug!("inside RpceServerRequestHandler closure");
                 request_callback.serve_req(sender_id, request)
             }),
-            name: String::from("load_server"),
         });
-        let cb = Box::into_raw(srh);
         unsafe {
-            tracing::debug!("load_server cb name: {}", (*cb).name);
-            let cb_obj = cb as *const _ as *const c_void as usize;
-            tracing::debug!("load_server cb_obj {:#x}", cb_obj);
+            let cb_obj = &*cb as *const _;
+            tracing::debug!("load_server cb_obj {:p}", cb_obj);
             let cmix_rpc_load_server_return { r0, r1 } =
-                cmix_rpc_load_server(self.cmix_instance, cb_obj);
+                cmix_rpc_load_server(self.cmix_instance, cb_obj as usize);
             go_error_into_result(
                 || Server {
                     instance_id: r0,
@@ -204,7 +200,6 @@ extern "C" fn cmix_rpc_send_error_cb(target: *mut c_void, err: *mut c_void, err_
 }
 
 pub struct RpcServerRequestHandler {
-    pub name: String,
     #[allow(clippy::type_complexity)]
     pub request_fn: Box<dyn Fn(Vec<u8>, Vec<u8>) -> Vec<u8>>,
 }
