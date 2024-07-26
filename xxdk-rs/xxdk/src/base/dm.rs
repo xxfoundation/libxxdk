@@ -1,4 +1,4 @@
-//! Exported callback functions for passing to the C library.
+//! Safe wrappers around the FFI bindings to the DM API.
 
 // We do a lot of casting e.g. `c_int` to `i32` in here, which on most systems is a no-op. Keeping
 // them there for cross-platform reasons, for systems on which the C types are not the usual bit
@@ -7,15 +7,143 @@
 
 use std::collections::HashMap;
 use std::os::raw::{c_char, c_int, c_long, c_void};
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 
-use xxdk_sys::{cmix_dm_set_router, DMReceiverRouterFunctions, GoByteSlice};
+use super::*;
 
-use crate::util::{
-    clone_bytes_from_raw_parts, clone_bytes_into_c_buffer, clone_string_from_raw_parts,
-};
+/// A cMix DM client.
+#[derive(Debug)]
+pub struct Dm {
+    pub(crate) instance_id: i32,
+}
 
-use super::Dm;
+impl Dm {
+    pub fn get_token(&self) -> Result<i32, String> {
+        unsafe {
+            let cmix_dm_GetDMToken_return { r0, r1 } = cmix_dm_GetDMToken(self.instance_id);
+            go_error_into_result(|| r0, r1)
+        }
+    }
+
+    pub fn get_dm_pubkey(&self) -> Result<Vec<u8>, String> {
+        unsafe {
+            let cmix_dm_GetDMPubKey_return { r0, r1 } = cmix_dm_GetDMPubKey(self.instance_id);
+            go_error_into_result(|| c_byte_slice_into_vec(r0), r1)
+        }
+    }
+
+    pub fn send(
+        &self,
+        partner_pubkey: &[u8],
+        dm_token: i32,
+        message_type: i64,
+        plaintext: &[u8],
+        lease_time_ms: i64,
+        cmix_params_json: &[u8],
+    ) -> Result<Vec<u8>, String> {
+        unsafe {
+            let cmix_dm_Send_return { r0, r1 } = cmix_dm_Send(
+                self.instance_id,
+                bytes_as_go_slice(partner_pubkey),
+                dm_token,
+                message_type,
+                bytes_as_go_slice(plaintext),
+                lease_time_ms,
+                bytes_as_go_slice(cmix_params_json),
+            );
+            go_error_into_result(|| c_byte_slice_into_vec(r0), r1)
+        }
+    }
+
+    pub fn send_text(
+        &self,
+        partner_pubkey: &[u8],
+        dm_token: i32,
+        message: &str,
+        lease_time_ms: i64,
+        cmix_params_json: &[u8],
+    ) -> Result<Vec<u8>, String> {
+        unsafe {
+            let cmix_dm_SendText_return { r0, r1 } = cmix_dm_SendText(
+                self.instance_id,
+                bytes_as_go_slice(partner_pubkey),
+                dm_token,
+                str_as_go_string(message),
+                lease_time_ms,
+                bytes_as_go_slice(cmix_params_json),
+            );
+            go_error_into_result(|| c_byte_slice_into_vec(r0), r1)
+        }
+    }
+
+    pub fn send_reply(
+        &self,
+        partner_pubkey: &[u8],
+        dm_token: i32,
+        message: &str,
+        reply_to: &[u8],
+        lease_time_ms: i64,
+        cmix_params_json: &[u8],
+    ) -> Result<Vec<u8>, String> {
+        unsafe {
+            let cmix_dm_SendReply_return { r0, r1 } = cmix_dm_SendReply(
+                self.instance_id,
+                bytes_as_go_slice(partner_pubkey),
+                dm_token,
+                str_as_go_string(message),
+                bytes_as_go_slice(reply_to),
+                lease_time_ms,
+                bytes_as_go_slice(cmix_params_json),
+            );
+            go_error_into_result(|| c_byte_slice_into_vec(r0), r1)
+        }
+    }
+
+    pub fn send_reaction(
+        &self,
+        partner_pubkey: &[u8],
+        dm_token: i32,
+        message: &str,
+        react_to: &[u8],
+        lease_time_ms: i64,
+        cmix_params_json: &[u8],
+    ) -> Result<Vec<u8>, String> {
+        unsafe {
+            let cmix_dm_SendReaction_return { r0, r1 } = cmix_dm_SendReaction(
+                self.instance_id,
+                bytes_as_go_slice(partner_pubkey),
+                dm_token,
+                str_as_go_string(message),
+                bytes_as_go_slice(react_to),
+                lease_time_ms,
+                bytes_as_go_slice(cmix_params_json),
+            );
+            go_error_into_result(|| c_byte_slice_into_vec(r0), r1)
+        }
+    }
+}
+
+impl CMix {
+    pub fn new_dm_client(
+        &self,
+        codename_identity: &[u8],
+        passphrase: &str,
+        callbacks: Arc<dyn DmCallbacks>,
+    ) -> Result<Dm, String> {
+        let instance_id = unsafe {
+            let cmix_dm_NewDMClient_return { r0, r1 } = cmix_dm_NewDMClient(
+                self.cmix_instance,
+                bytes_as_go_slice(codename_identity),
+                str_as_go_string(passphrase),
+            );
+            go_error_into_result(|| r0, r1)?
+        };
+
+        let dm = Dm { instance_id };
+        dm.set_callbacks(callbacks);
+        Ok(dm)
+    }
+}
 
 #[allow(clippy::too_many_arguments)]
 pub trait DmCallbacks: Send + Sync + 'static {

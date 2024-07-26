@@ -7,6 +7,7 @@
 
 package main
 
+// #include <stdint.h>
 // #include "callbacks.h"
 // #cgo CFLAGS: -I .
 //
@@ -142,15 +143,15 @@ package main
 //    cmix_rpc_server_cb = cb;
 //    return 1;
 // }
-// void cmix_rpc_send_response(void *obj, void *response, int response_len) {
-//    cmix_rpc_send_error_cb(obj, response, response_len);
+// void cmix_rpc_send_response(uintptr_t obj, void *response, int response_len) {
+//    cmix_rpc_send_error_cb((void*)obj, response, response_len);
 // }
-// void cmix_rpc_send_error(void *obj, void *response, int response_len) {
-//    cmix_rpc_send_error_cb(obj, response, response_len);
+// void cmix_rpc_send_error(uintptr_t obj, void *response, int response_len) {
+//    cmix_rpc_send_error_cb((void*)obj, response, response_len);
 // }
-// GoByteSlice cmix_rpc_server_request(void *obj,
+// GoByteSlice cmix_rpc_server_request(uintptr_t obj,
 //   void *sender, int sender_len,
 //   void *request, int request_len) {
-//    return cmix_rpc_server_cb(obj, sender, sender_len, request, request_len);
+//    return cmix_rpc_server_cb((void*)obj, sender, sender_len, request, request_len);
 // }
 import "C"

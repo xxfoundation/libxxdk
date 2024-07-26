@@ -7,6 +7,7 @@
 
 package main
 
+// #include <stdint.h>
 // #include "callbacks.h"
 // #cgo CFLAGS: -I .
 //
@@ -68,6 +69,11 @@ package main
 // extern GoByteSlice cmix_rpc_server_request(void *obj,
 //   void *sender, int sender_len,
 //   void *request, int request_len);
+// extern int register_cmix_rpc_send_callbacks(
+//    cmix_rpc_send_response_fn response_fn,
+//    cmix_rpc_send_error_fn error_fn);
+// extern int register_cmix_rpc_server_callback(
+//    cmix_rpc_server_callback_fn cb);
 import "C"
 
 import (
@@ -503,8 +509,7 @@ func (dmr *dmReceiver) EventUpdate(eventType int64, jsonData []byte) {
 ////
 
 //export cmix_rpc_send
-func cmix_rpc_send(cMixInstanceID int32, recipient, pubkey, request []byte,
-	callbackObject unsafe.Pointer) (
+func cmix_rpc_send(cMixInstanceID int32, recipient, pubkey, request []byte) (
 	int32, C.GoError) {
 	res := bindings.RPCSend(int(cMixInstanceID), recipient, pubkey, request)
 
@@ -561,17 +566,26 @@ func cmix_rpc_generate_reception_id(cMixID int32) (C.GoByteSlice, C.GoError) {
 	return makeBytes(i), makeError(err)
 }
 
-//export cmix_rpc_generate_random_rpc_key
-func cmix_rpc_generate_random_rpc_key(cMixID int32) (C.GoByteSlice, C.GoError) {
+//export cmix_rpc_generate_random_key
+func cmix_rpc_generate_random_key(cMixID int32) (C.GoByteSlice, C.GoError) {
 	i, err := bindings.GenerateRandomRPCKey(int(cMixID))
+	return makeBytes(i), makeError(err)
+}
+
+//export cmix_rpc_derive_public_key
+func cmix_rpc_derive_public_key(private_key []byte) (
+	C.GoByteSlice, C.GoError) {
+	i, err := bindings.DeriveRPCPublicKey(private_key)
 	return makeBytes(i), makeError(err)
 }
 
 //export cmix_rpc_new_server
 func cmix_rpc_new_server(cMixID int32, callbackObj unsafe.Pointer,
 	reception_id, private_key []byte) (int32, C.GoError) {
+	jww.ERROR.Printf("CallbackObj PTR SETUP: %v", callbackObj)
 	srvCb := &rpcServerCb{
 		cb: func(sender, request []byte) []byte {
+			jww.ERROR.Printf("CallbackObj PTR: %v", callbackObj)
 			r := C.cmix_rpc_server_request(callbackObj,
 				C.CBytes(sender), C.int(len(sender)),
 				C.CBytes(request), C.int(len(request)))
@@ -598,8 +612,10 @@ func cmix_rpc_new_server(cMixID int32, callbackObj unsafe.Pointer,
 //export cmix_rpc_load_server
 func cmix_rpc_load_server(cMixID int32, callbackObj unsafe.Pointer) (
 	int32, C.GoError) {
+	jww.ERROR.Printf("CallbackObj PTR SETUP: %v", callbackObj)
 	srvCb := &rpcServerCb{
 		cb: func(sender, request []byte) []byte {
+			jww.ERROR.Printf("CallbackObj PTR: %v", callbackObj)
 			r := C.cmix_rpc_server_request(callbackObj,
 				C.CBytes(sender), C.int(len(sender)),
 				C.CBytes(request), C.int(len(request)))

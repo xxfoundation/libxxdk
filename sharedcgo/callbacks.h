@@ -7,6 +7,8 @@
 #ifndef CALLBACKS_H
 #define CALLBACKS_H
 
+#include <stdint.h>
+
 typedef struct {
   int   len;
   void* data;

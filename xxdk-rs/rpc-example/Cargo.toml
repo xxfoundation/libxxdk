@@ -1,0 +1,15 @@
+[package]
+name = "rpc-example"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+base64 = "0.22.0"
+structopt = "0.3.26"
+tracing = "0.1.40"
+tracing-subscriber = "0.3"
+async-std = { version = "1", features = ["attributes", "tokio1"] }
+tokio = { version = "1.37.0", features = ["macros", "rt", "fs", "sync", "time"] }
+xxdk = { version = "0.1.0", path = "../xxdk" }

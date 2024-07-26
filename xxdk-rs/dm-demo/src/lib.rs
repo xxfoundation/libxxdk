@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use base64::prelude::*;
 use structopt::StructOpt;
-use xxdk::base::callbacks::DmCallbacks;
+use xxdk::base::dm::DmCallbacks;
 use xxdk::base::*;
 
 const SECRET: &str = "Hello";
