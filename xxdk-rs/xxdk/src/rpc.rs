@@ -183,8 +183,8 @@ where
     let rpc_server = cmix.new_rpc_server(cbs, reception_id, private_key)?;
     rpc_server.start();
     tracing::info!(
-        "RPC Server CB PTR: {:#x}",
-        rpc_server.cb as *const _ as *const libc::c_void as usize
+        "RPC Server CB PTR: {:p}",
+        rpc_server.cb,
     );
     tracing::info!("RPC Server Started");
     tracing::info!("RPC Public Key: {public_key_b64}");

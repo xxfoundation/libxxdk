@@ -1,5 +1,7 @@
 //! Safe wrappers around the FFI bindings to the RPC API.
 
+use std::pin::Pin;
+
 use libc::*;
 use xxdk_sys::*;
 
@@ -62,7 +64,7 @@ pub trait ServerCallback {
 pub struct Server {
     pub(crate) instance_id: i32,
     #[allow(dead_code)]
-    pub(crate) cb: *mut RpcServerRequestHandler,
+    pub(crate) cb: Pin<Box<RpcServerRequestHandler>>,
 }
 
 impl CMix {
@@ -72,21 +74,18 @@ impl CMix {
         reception_id: Vec<u8>,
         private_key: Vec<u8>,
     ) -> Result<Server, String> {
-        let srh = Box::new(RpcServerRequestHandler {
+        let cb = Box::pin(RpcServerRequestHandler {
             request_fn: Box::new(move |sender_id: Vec<u8>, request: Vec<u8>| -> Vec<u8> {
                 tracing::debug!("inside RpceServerRequestHandler closure");
                 request_callback.serve_req(sender_id, request)
             }),
-            name: String::from("new_server"),
         });
-        let cb = Box::into_raw(srh);
         unsafe {
-            tracing::debug!("new_server cb name: {}", (*cb).name);
-            let cb_obj = cb as *const _ as *const c_void as usize;
-            tracing::debug!("new_server cb_obj {:#x}", cb_obj);
+            let cb_obj = &*cb as *const _;
+            tracing::debug!("new_server cb_obj {:p}", cb_obj);
             let cmix_rpc_new_server_return { r0, r1 } = cmix_rpc_new_server(
                 self.cmix_instance,
-                cb_obj,
+                cb_obj as _,
                 bytes_as_go_slice(&reception_id),
                 bytes_as_go_slice(&private_key),
             );
@@ -104,20 +103,17 @@ impl CMix {
         &self,
         request_callback: T,
     ) -> Result<Server, String> {
-        let srh = Box::new(RpcServerRequestHandler {
+        let cb = Box::pin(RpcServerRequestHandler {
             request_fn: Box::new(move |sender_id: Vec<u8>, request: Vec<u8>| -> Vec<u8> {
                 tracing::debug!("inside RpceServerRequestHandler closure");
                 request_callback.serve_req(sender_id, request)
             }),
-            name: String::from("load_server"),
         });
-        let cb = Box::into_raw(srh);
         unsafe {
-            tracing::debug!("load_server cb name: {}", (*cb).name);
-            let cb_obj = cb as *const _ as *const c_void as usize;
-            tracing::debug!("load_server cb_obj {:#x}", cb_obj);
+            let cb_obj = &*cb as *const _;
+            tracing::debug!("load_server cb_obj {:p}", cb_obj);
             let cmix_rpc_load_server_return { r0, r1 } =
-                cmix_rpc_load_server(self.cmix_instance, cb_obj);
+                cmix_rpc_load_server(self.cmix_instance, cb_obj as _);
             go_error_into_result(
                 || Server {
                     instance_id: r0,
@@ -161,9 +157,8 @@ impl RpcResponse {
     pub fn callback(&mut self, response_fn: Box<dyn Fn(Vec<u8>)>, err_fn: Box<dyn Fn(Vec<u8>)>) {
         self.response_fn = Some(response_fn);
         self.error_fn = Some(err_fn);
-        let ptr = self as *mut _ as *mut c_void as usize;
-        tracing::trace!("callback conversion {:#x}", ptr);
-        unsafe { cmix_rpc_send_callback(self.instance_id, ptr) }
+        tracing::trace!("callback conversion {:p}", self);
+        unsafe { cmix_rpc_send_callback(self.instance_id, self as *const _ as _) }
     }
     pub fn wait(&self) {
         unsafe {
@@ -179,10 +174,10 @@ extern "C" fn cmix_rpc_send_response_cb(
 ) {
     unsafe {
         tracing::trace!(
-            "cmix_rpc_send_response_cb conversion {:#x}",
-            target as usize
+            "cmix_rpc_send_response_cb conversion {:p}",
+            target,
         );
-        let rpc_obj = &mut *(target as *mut RpcResponse);
+        let rpc_obj = &*(target as *const RpcResponse);
         let r = response as *const u8;
         let rs = response_len as usize;
         let response = clone_bytes_from_raw_parts(r, rs);
@@ -193,8 +188,8 @@ extern "C" fn cmix_rpc_send_response_cb(
 
 extern "C" fn cmix_rpc_send_error_cb(target: *mut c_void, err: *mut c_void, err_len: c_int) {
     unsafe {
-        tracing::trace!("cmix_rpc_send_error_cb conversion {:#x}", target as usize);
-        let rpc_obj = &mut *(target as *mut RpcResponse);
+        tracing::trace!("cmix_rpc_send_error_cb conversion {:p}", target);
+        let rpc_obj = &*(target as *const RpcResponse);
         let e = err as *const u8;
         let es = err_len as usize;
         let response = clone_bytes_from_raw_parts(e, es);
@@ -204,7 +199,6 @@ extern "C" fn cmix_rpc_send_error_cb(target: *mut c_void, err: *mut c_void, err_
 }
 
 pub struct RpcServerRequestHandler {
-    pub name: String,
     #[allow(clippy::type_complexity)]
     pub request_fn: Box<dyn Fn(Vec<u8>, Vec<u8>) -> Vec<u8>>,
 }
@@ -219,8 +213,8 @@ extern "C" fn cmix_rpc_server_cb(
     request_len: c_int,
 ) -> GoByteSlice {
     unsafe {
-        tracing::trace!("cmix_rpc_server_cb conversion {:#x}", target as usize);
-        let rpc_obj: &mut RpcServerRequestHandler = &mut *(target as *mut RpcServerRequestHandler);
+        tracing::trace!("cmix_rpc_server_cb conversion {:p}", target);
+        let rpc_obj: &RpcServerRequestHandler = &*(target as *const RpcServerRequestHandler);
         let s = sender as *const u8;
         let ss = sender_len as usize;
         let sndr = clone_bytes_from_raw_parts(s, ss);

@@ -64,9 +64,9 @@ package main
 //    long event_type, void* json_data,
 //    int json_data_len);
 // extern void cmix_dm_set_router(DMReceiverRouterFunctions cbs);
-// extern void cmix_rpc_send_response(uintptr_t obj, void *response, int response_len);
-// extern void cmix_rpc_send_error(uintptr_t obj, void *response, int response_len);
-// extern GoByteSlice cmix_rpc_server_request(uintptr_t obj,
+// extern void cmix_rpc_send_response(void *obj, void *response, int response_len);
+// extern void cmix_rpc_send_error(void *obj, void *response, int response_len);
+// extern GoByteSlice cmix_rpc_server_request(void *obj,
 //   void *sender, int sender_len,
 //   void *request, int request_len);
 // extern int register_cmix_rpc_send_callbacks(
@@ -79,6 +79,7 @@ import "C"
 import (
 	"fmt"
 	"strings"
+	"unsafe"
 
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
@@ -525,7 +526,7 @@ func cmix_rpc_send(cMixInstanceID int32, recipient, pubkey, request []byte) (
 
 //export cmix_rpc_send_callback
 func cmix_rpc_send_callback(response_id int32,
-	callbackObject C.uintptr_t) {
+	callbackObject unsafe.Pointer) {
 	rpcLock.Lock()
 	res, ok := rpcResponses[response_id]
 	rpcLock.Unlock()
@@ -579,7 +580,7 @@ func cmix_rpc_derive_public_key(private_key []byte) (
 }
 
 //export cmix_rpc_new_server
-func cmix_rpc_new_server(cMixID int32, callbackObj C.uintptr_t,
+func cmix_rpc_new_server(cMixID int32, callbackObj unsafe.Pointer,
 	reception_id, private_key []byte) (int32, C.GoError) {
 	jww.ERROR.Printf("CallbackObj PTR SETUP: %v", callbackObj)
 	srvCb := &rpcServerCb{
@@ -609,7 +610,7 @@ func cmix_rpc_new_server(cMixID int32, callbackObj C.uintptr_t,
 }
 
 //export cmix_rpc_load_server
-func cmix_rpc_load_server(cMixID int32, callbackObj C.uintptr_t) (
+func cmix_rpc_load_server(cMixID int32, callbackObj unsafe.Pointer) (
 	int32, C.GoError) {
 	jww.ERROR.Printf("CallbackObj PTR SETUP: %v", callbackObj)
 	srvCb := &rpcServerCb{
