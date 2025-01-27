@@ -406,3 +406,7 @@ ASALocalRun/
 
 # Rust build artifacts
 xxdk-rs/target
+
+# C/C++ build artifacts
+*.o
+/e2e_client

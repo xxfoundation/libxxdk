@@ -7,83 +7,90 @@
 
 package main
 
-// #include <stdint.h>
-// #include "callbacks.h"
-// #cgo CFLAGS: -I .
-//
-// // below are the callbacks defined in callbacks.go
-// extern long cmix_dm_receive(int dm_instance_id,
-//    void* mesage_id, int message_id_len,
-//    char* nickname, int nickname_len,
-//    void* text, int text_len,
-//    void* partnerkey, int partnerkey_len,
-//    void* senderkey, int senderkey_len,
-//    int dmToken, int codeset,
-//    long timestamp, long round_id, long message_type, long status);
-// extern long cmix_dm_receive_text(int dm_instance_id,
-//    void* message_id, int message_id_len,
-//    char* nickname, int nickname_len,
-//    char* text, int text_len,
-//    void* partnerkey, int partnerkey_len,
-//    void* senderkey, int senderkey_len,
-//    int dmToken, int codeset,
-//    long timestamp, long round_id, long status);
-// extern long cmix_dm_receive_reply(int dm_instance_id,
-//    void* message_id, int message_id_len,
-//    void* reply_to, int reply_to_len,
-//    char* nickname, int nickname_len,
-//    char* text, int text_len,
-//    void* partnerkey, int partnerkey_len,
-//    void* senderkey, int senderkey_len,
-//    int dmToken, int codeset,
-//    long timestamp, long round_id, long status);
-// extern long cmix_dm_receive_reaction(int dm_instance_id,
-//    void* message_id, int message_id_len,
-//    void* reaction_to, int reaction_to_len,
-//    char* nickname, int nickname_len,
-//    char* text, int text_len,
-//    void* partnerkey, int partnerkey_len,
-//    void* senderkey, int senderkey_len,
-//    int dmToken, int codeset,
-//    long timestamp, long round_id, long status);
-// extern void cmix_dm_update_sent_status(int dm_instance_id,
-//    long uuid,
-//    void* message_id, int message_id_len, long timestamp,
-//    long round_id, long status);
-// extern void cmix_dm_block_sender(int dm_instance_id,
-//    void* pubkey, int pubkey_len);
-// extern void cmix_dm_unblock_sender(int dm_instance_id,
-//    void* pubkey, int pubkey_len);
-// extern GoByteSlice cmix_dm_get_conversation(int dm_instance_id,
-//    void* senderkey, int senderkey_len);
-// extern GoByteSlice cmix_dm_get_conversations(int dm_instance_id);
-// extern int cmix_dm_delete_message(int dm_instance_id,
-//    void* message_id, int message_id_len,
-//    void* pubkey, int pubkey_len);
-// extern int cmix_dm_event_update(int dm_instance_id,
-//    long event_type, void* json_data,
-//    int json_data_len);
-// extern void cmix_dm_set_router(DMReceiverRouterFunctions cbs);
-// extern void cmix_rpc_send_response(void *obj, void *response, int response_len);
-// extern void cmix_rpc_send_error(void *obj, void *response, int response_len);
-// extern GoByteSlice cmix_rpc_server_request(void *obj,
-//   void *sender, int sender_len,
-//   void *request, int request_len);
-// extern int register_cmix_rpc_send_callbacks(
-//    cmix_rpc_send_response_fn response_fn,
-//    cmix_rpc_send_error_fn error_fn);
-// extern int register_cmix_rpc_server_callback(
-//    cmix_rpc_server_callback_fn cb);
+/*
+#include <stdint.h>
+#include "callbacks.h"
+#cgo CFLAGS: -I .
+
+typedef int CMix;
+
+// below are the callbacks defined in callbacks.go
+extern long cmix_dm_receive(int dm_instance_id,
+   void* mesage_id, int message_id_len,
+   char* nickname, int nickname_len,
+   void* text, int text_len,
+   void* partnerkey, int partnerkey_len,
+   void* senderkey, int senderkey_len,
+   int dmToken, int codeset,
+   long timestamp, long round_id, long message_type, long status);
+extern long cmix_dm_receive_text(int dm_instance_id,
+   void* message_id, int message_id_len,
+   char* nickname, int nickname_len,
+   char* text, int text_len,
+   void* partnerkey, int partnerkey_len,
+   void* senderkey, int senderkey_len,
+   int dmToken, int codeset,
+   long timestamp, long round_id, long status);
+extern long cmix_dm_receive_reply(int dm_instance_id,
+   void* message_id, int message_id_len,
+   void* reply_to, int reply_to_len,
+   char* nickname, int nickname_len,
+   char* text, int text_len,
+   void* partnerkey, int partnerkey_len,
+   void* senderkey, int senderkey_len,
+   int dmToken, int codeset,
+   long timestamp, long round_id, long status);
+extern long cmix_dm_receive_reaction(int dm_instance_id,
+   void* message_id, int message_id_len,
+   void* reaction_to, int reaction_to_len,
+   char* nickname, int nickname_len,
+   char* text, int text_len,
+   void* partnerkey, int partnerkey_len,
+   void* senderkey, int senderkey_len,
+   int dmToken, int codeset,
+   long timestamp, long round_id, long status);
+extern void cmix_dm_update_sent_status(int dm_instance_id,
+   long uuid,
+   void* message_id, int message_id_len, long timestamp,
+   long round_id, long status);
+extern void cmix_dm_block_sender(int dm_instance_id,
+   void* pubkey, int pubkey_len);
+extern void cmix_dm_unblock_sender(int dm_instance_id,
+   void* pubkey, int pubkey_len);
+extern GoByteSlice cmix_dm_get_conversation(int dm_instance_id,
+   void* senderkey, int senderkey_len);
+extern GoByteSlice cmix_dm_get_conversations(int dm_instance_id);
+extern int cmix_dm_delete_message(int dm_instance_id,
+   void* message_id, int message_id_len,
+   void* pubkey, int pubkey_len);
+extern int cmix_dm_event_update(int dm_instance_id,
+   long event_type, void* json_data,
+   int json_data_len);
+extern void cmix_dm_set_router(DMReceiverRouterFunctions cbs);
+extern void cmix_rpc_send_response(void *obj, void *response, int response_len);
+extern void cmix_rpc_send_error(void *obj, void *response, int response_len);
+extern GoByteSlice cmix_rpc_server_request(void *obj,
+  void *sender, int sender_len,
+  void *request, int request_len);
+extern int register_cmix_rpc_send_callbacks(
+   cmix_rpc_send_response_fn response_fn,
+   cmix_rpc_send_error_fn error_fn);
+extern int register_cmix_rpc_server_callback(
+   cmix_rpc_server_callback_fn cb);
+*/
 import "C"
 
 import (
 	"fmt"
-	"strings"
+	// "strings"
 	"unsafe"
 
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/client/v4/bindings"
+	"gitlab.com/elixxir/client/v4/xxdk"
+
+	// "gitlab.com/elixxir/client/v4/xxdk"
 	"gitlab.com/elixxir/client/v4/dm"
 	"gitlab.com/elixxir/crypto/codename"
 	"gitlab.com/elixxir/crypto/fastRNG"
@@ -91,17 +98,12 @@ import (
 )
 
 func makeError(e error) C.GoError {
-	isErr := 0
-	Msg := ""
 	if e != nil {
-		isErr = 1
-		Msg = fmt.Sprintf("%+v", e)
+		msg := fmt.Sprintf("%+v", e)
+		return C.CString(msg)
 	}
-	return C.GoError{
-		IsError: C.int(isErr),
-		Msg:     C.CString(Msg),
-		MsgLen:  C.int(len(Msg)),
-	}
+
+	return nil
 }
 
 func makeBytes(s []byte) C.GoByteSlice {
@@ -117,44 +119,79 @@ func makeBytes(s []byte) C.GoByteSlice {
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
-// GetVersion returns the xxdk.SEMVER.
+// Get the xxDK version string.
 //
-//export GetVersion
-func GetVersion() string {
-	return bindings.GetVersion()
+// The string is allocated on the C heap with malloc. The caller should arrange for it to be freed.
+//
+//export xx_GetVersion
+func xx_GetVersion() *C.char {
+	return C.CString(xxdk.SEMVER)
 }
 
-// GetGitVersion returns the xxdk.GITVERSION.
+// Get the xxDK git version string.
 //
-//export GetGitVersion
-func GetGitVersion() string {
-	return bindings.GetGitVersion()
+// The string is allocated on the C heap with malloc. The caller should arrange for it to be freed.
+//
+//export xx_GetGitVersion
+func xx_GetGitVersion() *C.char {
+	return C.CString(xxdk.GITVERSION)
 }
 
-// GetDependencies returns the xxdk.DEPENDENCIES.
+// Get the xxDK dependencies string.
 //
-//export GetDependencies
-func GetDependencies() string {
-	return bindings.GetDependencies()
+// The string is allocated on the C heap with malloc. The caller should arrange for it to be freed.
+//
+//export xx_GetDependencies
+func xx_GetDependencies() *C.char {
+	return C.CString(xxdk.DEPENDENCIES)
 }
 
-// NewCmix creates user storage, generates keys, connects, and registers with
-// the network. Note that this does not register a username/identity, but merely
-// creates a new cryptographic identity for adding such information at a later
-// date.
+// Attempt to download an NDF from a specified URL.
+//
+// The NDF is processed into a protobuf containing a signature that is verified
+// using the cert string passed in. The NDF is returned as JSON data that may be
+// used to start a client.
+//
+//export xx_DownloadAndVerifySignedNdfWithUrl
+func xx_DownloadAndVerifySignedNdfWithUrl(url, cert *C.char, out_ndf **C.char) C.GoError {
+	goUrl, goCert := C.GoString(url), C.GoString(cert)
+	ndf, err := xxdk.DownloadAndVerifySignedNdfWithUrl(goUrl, goCert)
+
+	if err != nil {
+		*out_ndf = nil
+		return makeError(err)
+	}
+
+	*out_ndf = C.CString(string(ndf))
+
+	return nil
+}
+
+// Create a new cMix user storage.
+//
+// This will create the user storage directory, generate keys, connect,
+// and register with the network. Note that this does not register a
+// username/identity, but merely creates a new cryptographic identity for adding
+// such information at a later date.
 //
 // Users of this function should delete the storage directory on error.
 //
-//export NewCmix
-func NewCmix(ndfJSON, storageDir string, password []byte,
-	registrationCode string) C.GoError {
-	err := bindings.NewCmix(ndfJSON, storageDir, password, registrationCode)
+//export xx_NewCmix
+func xx_NewCmix(ndfJSON, storageDir *C.char, password unsafe.Pointer, password_len C.int,
+	registrationCode *C.char) C.GoError {
+	goNdfJSON := C.GoString(ndfJSON)
+	goStorageDir := C.GoString(storageDir)
+	goPassword := C.GoBytes(password, password_len)
+	goRegistrationCode := C.GoString(registrationCode)
+
+	err := bindings.NewCmix(goNdfJSON, goStorageDir, goPassword, goRegistrationCode)
 	return makeError(err)
 }
 
-// LoadCmix will load an existing user storage from the storageDir using the
-// password. This will fail if the user storage does not exist or the password
-// is incorrect.
+// Load an existing cMix user storage.
+//
+// This will fail if the user storage does not exist or the password is
+// incorrect.
 //
 // The password is passed as a byte array so that it can be cleared from memory
 // and stored as securely as possible using the MemGuard library.
@@ -162,30 +199,30 @@ func NewCmix(ndfJSON, storageDir string, password []byte,
 // LoadCmix does not block on network connection and instead loads and starts
 // subprocesses to perform network operations.
 //
-// This function returns a cMix Instance ID (int32) required to call
-// specific cMix functions. If an error occurs, instance ID -1 is returned.
+// This function returns, via the `out_cmix` parameter, a cMix Instance ID
+// (int32) required to call specific cMix functions. If an error occurs,
+// instance ID -1 is returned.
 //
 // Creating multiple cMix instance IDs with the same storage Dir will
 // cause data corruption. In most cases only 1 instance should ever be
 // needed.
 //
-//export LoadCmix
-func LoadCmix(storageDir string, password []byte, cmixParamsJSON []byte) (int32,
-	C.GoError) {
-	// NOTE: we copy here because the elements need to persist.
-	// We assume everything is freed after use when sent over the
-	// c lib boundary.
-	storageDirCpy := strings.Clone(storageDir)
-	secret := make([]byte, len(password))
-	copy(secret, password)
-	cmixParams := make([]byte, len(cmixParamsJSON))
-	copy(cmixParams, cmixParamsJSON)
+//export xx_LoadCmix
+func xx_LoadCmix(storageDir *C.char, password unsafe.Pointer, passwordLen C.int,
+	cmixParamsJSON *C.char, out_cmix *C.CMix) C.GoError {
+	storageDirCpy := C.GoString(storageDir)
+	secret := C.GoBytes(password, passwordLen)
+	cmixParamsStr := C.GoString(cmixParamsJSON)
+	cmixParams := []byte(cmixParamsStr)
 
 	instance, err := bindings.LoadCmix(storageDirCpy, secret, cmixParams)
 	if err != nil {
-		return -1, makeError(err)
+		*out_cmix = -1
+		return makeError(err)
 	}
-	return int32(instance.GetID()), makeError(nil)
+
+	*out_cmix = C.CMix(instance.GetID())
+	return makeError(nil)
 }
 
 // cmix_GetReceptionID returns the current default reception ID

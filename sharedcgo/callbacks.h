@@ -14,12 +14,14 @@ typedef struct {
   void* data;
 } GoByteSlice;
 
-typedef struct {
-  int   IsError;
-  char* Msg;
-  int   MsgLen;
-} GoError;
-
+// xxDK functions that may fail have `GoError` as their return type, and pass
+// their other results via out parameters.
+//
+// `GoError` is a typedef for `char *`. If a function returning `GoError`
+// returns successfully, it will return null. Otherwise, it will return a
+// null-terminated string representing an error message. The string will be
+// allocated with `malloc`; the caller should arrange to `free` it.
+typedef char *GoError;
 
 typedef long (* cmix_dm_receive_fn)(int dm_instance_id,
   void* message_id, int message_id_len,
