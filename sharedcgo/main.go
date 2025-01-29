@@ -10,11 +10,9 @@ package main
 /*
 #include <stdint.h>
 #include "callbacks.h"
-#cgo CFLAGS: -I .
-
-typedef int CMix;
 
 // below are the callbacks defined in callbacks.go
+
 extern long cmix_dm_receive(int dm_instance_id,
    void* mesage_id, int message_id_len,
    char* nickname, int nickname_len,
@@ -82,16 +80,13 @@ import "C"
 
 import (
 	"fmt"
-	// "strings"
 	"unsafe"
 
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/client/v4/bindings"
-	"gitlab.com/elixxir/client/v4/xxdk"
-
-	// "gitlab.com/elixxir/client/v4/xxdk"
 	"gitlab.com/elixxir/client/v4/dm"
+	"gitlab.com/elixxir/client/v4/xxdk"
 	"gitlab.com/elixxir/crypto/codename"
 	"gitlab.com/elixxir/crypto/fastRNG"
 	"gitlab.com/xx_network/crypto/csprng"
@@ -209,7 +204,7 @@ func xx_NewCmix(ndfJSON, storageDir *C.char, password unsafe.Pointer, password_l
 //
 //export xx_LoadCmix
 func xx_LoadCmix(storageDir *C.char, password unsafe.Pointer, passwordLen C.int,
-	cmixParamsJSON *C.char, out_cmix *C.CMix) C.GoError {
+	cmixParamsJSON *C.char, out_cmix *C.Cmix) C.GoError {
 	storageDirCpy := C.GoString(storageDir)
 	secret := C.GoBytes(password, passwordLen)
 	cmixParamsStr := C.GoString(cmixParamsJSON)
@@ -217,42 +212,162 @@ func xx_LoadCmix(storageDir *C.char, password unsafe.Pointer, passwordLen C.int,
 
 	instance, err := bindings.LoadCmix(storageDirCpy, secret, cmixParams)
 	if err != nil {
-		*out_cmix = -1
+		*out_cmix = C.Cmix(-1)
 		return makeError(err)
 	}
 
-	*out_cmix = C.CMix(instance.GetID())
-	return makeError(nil)
+	*out_cmix = C.Cmix(instance.GetID())
+	return nil
 }
 
-// cmix_GetReceptionID returns the current default reception ID
+// func xx_MakeReceptionIdentity(cMix C.Cmix, out_rid *unsafe.Pointer, out_ridLen *C.int) C.GoError {
+// 	goCMix, err := bindings.GetCMixInstance(int(cMix))
+// 	if err != nil {
+// 		*out_rid = nil
+// 		*out_ridLen = 0
+// 		return makeError(err)
+// 	}
+
+// 	goRid = xxdk.MakeReceptionIdentity()
+// }
+
+// Get the current default reception ID for the given cMix instance.
+//
+// On success, `*out_rid` will contain the reception ID as a null-terminated
+// JSON string. The reception ID is allocated using `malloc`; the caller should
+// arrange to free it.
+//
+// On error, `*out_rid` will be null.
 //
 //export cmix_GetReceptionID
-func cmix_GetReceptionID(cMixInstanceID int32) (C.GoByteSlice, C.GoError) {
-	cMix, err := bindings.GetCMixInstance(int(cMixInstanceID))
+func cmix_GetReceptionID(cMix C.Cmix, out_rid **C.char) C.GoError {
+	goCMix, err := bindings.GetCMixInstance(int(cMix))
 	if err != nil {
-		return makeBytes(nil), makeError(err)
+		*out_rid = nil
+		return makeError(err)
 	}
-	return makeBytes(cMix.GetReceptionID()), makeError(nil)
+
+	goRid := goCMix.GetReceptionID()
+	*out_rid = C.CString(string(goRid))
+
+	return nil
 }
 
-//export cmix_EKVGet
-func cmix_EKVGet(cMixInstanceID int32, key string) (C.GoByteSlice, C.GoError) {
-	cMix, err := bindings.GetCMixInstance(int(cMixInstanceID))
-	if err != nil {
-		return makeBytes(nil), makeError(err)
-	}
-	val, err := cMix.EKVGet(key)
-	return makeBytes(val), makeError(err)
-}
-
-//export cmix_EKVSet
-func cmix_EKVSet(cMixInstanceID int32, key string, value []byte) C.GoError {
-	cMix, err := bindings.GetCMixInstance(int(cMixInstanceID))
+// Generate a new cryptographic identity for receiving messages.
+//
+// The reception identity is returned as a null-terminated JSON string allocated
+// with `malloc`. On error, `*out_rid` will be null.
+//
+//export cmix_MakeReceptionIdentity
+func cmix_MakeReceptionIdentity(cmix C.Cmix, out_rid **C.char) C.GoError {
+	*out_rid = nil
+	goCmix, err := bindings.GetCMixInstance(int(cmix))
 	if err != nil {
 		return makeError(err)
 	}
-	return makeError(cMix.EKVSet(key, value))
+
+	goRidBytes, err := goCmix.MakeLegacyReceptionIdentity()
+	if err != nil {
+		return makeError(err)
+	}
+
+	*out_rid = C.CString(string(goRidBytes))
+	return nil
+}
+
+// Store the given reception identity in the given Cmix instance's encrypted
+// key-value store, with the given key.
+//
+//export cmix_StoreReceptionIdentity
+func cmix_StoreReceptionIdentity(cmix C.Cmix, key *C.char, rid *C.char) C.GoError {
+	return makeError(bindings.StoreReceptionIdentity(C.GoString(key), []byte(C.GoString(rid)), int(cmix)))
+}
+
+// Load a reception identity from the given Cmix instance's encrypted store, using the given key.
+//
+// The reception identity is returned as a null-terminated JSON string allocated
+// with `malloc`. On error, `*out_rid` will be null.
+//
+//export cmix_LoadReceptionIdentity
+func cmix_LoadReceptionIdentity(cmix C.Cmix, key *C.char, out_rid **C.char) C.GoError {
+	*out_rid = nil
+	goRid, err := bindings.LoadReceptionIdentity(C.GoString(key), int(cmix))
+	if err != nil {
+		return makeError(err)
+	}
+
+	*out_rid = C.CString(string(goRid))
+	return nil
+}
+
+// Get the contact for the given reception identity.
+//
+// The contact is returned as a `malloc`-allocated byte array in a compact
+// binary format. On error, `*out_contact` will be null and `*out_contactLen` will
+// be zero.
+//
+//export rid_GetContact
+func rid_GetContact(rid *C.char, out_contact *unsafe.Pointer, out_contactLen *C.int) C.GoError {
+	*out_contact = nil
+	*out_contactLen = 0
+
+	goRidJson := []byte(C.GoString(rid))
+	goRid, err := xxdk.UnmarshalReceptionIdentity(goRidJson)
+	if err != nil {
+		return makeError(err)
+	}
+
+	goContact := goRid.GetContact()
+	goContactBytes := goContact.Marshal()
+	*out_contact = C.CBytes(goContactBytes)
+	*out_contactLen = C.int(len(goContactBytes))
+	return nil
+}
+
+// Retrieve a value inside the given cMix instance's encrypted key-value store.
+//
+// On success, `*out_value` will contain a pointer to the retrieved value, and
+// `*out_valueLen` will contain the length in bytes of the value. The value is
+// allocated using `malloc`; the caller should arrange to free it.
+//
+// On error, `*out_value` will be null, and `*out_valueLen` will be 0.
+//
+//export cmix_EKVGet
+func cmix_EKVGet(cMix C.Cmix, key *C.char, out_value *unsafe.Pointer, out_valueLen *C.int) C.GoError {
+	goCMix, err := bindings.GetCMixInstance(int(cMix))
+	if err != nil {
+		*out_value = nil
+		*out_valueLen = 0
+		return makeError(err)
+	}
+
+	goKey := C.GoString(key)
+	goVal, err := goCMix.EKVGet(goKey)
+	if err != nil {
+		*out_value = nil
+		*out_valueLen = 0
+		return makeError(err)
+	}
+
+	*out_value = C.CBytes(goVal)
+	*out_valueLen = C.int(len(goVal))
+
+	return nil
+}
+
+// Set a value inside the given cMix instance's encrypted key-value store.
+//
+//export cmix_EKVSet
+func cmix_EKVSet(cMix C.Cmix, key *C.char, value unsafe.Pointer, valueLen C.int) C.GoError {
+	goCMix, err := bindings.GetCMixInstance(int(cMix))
+	if err != nil {
+		return makeError(err)
+	}
+
+	goKey := C.GoString(key)
+	goValue := C.GoBytes(value, valueLen)
+
+	return makeError(goCMix.EKVSet(goKey, goValue))
 }
 
 //export cmix_StartNetworkFollower

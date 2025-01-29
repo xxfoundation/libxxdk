@@ -1,3 +1,20 @@
+// E2E Client xxDK example
+//
+// This is a C++ translation of the E2E client example:
+// https://git.xx.network/xx_network/xxdk-examples/-/tree/master/other-examples/e2eClient
+//
+// It makes use of C++17 features, in particular the standard library
+// cross-platform filesystem API. Your C++ compiler must support C++17 in order
+// to build this example.
+//
+// To build:
+//
+//   $ make e2e_client
+//
+// To run:
+//
+//   $ ./e2e_client
+
 #include "libxxdk.h"
 #include <cstring>
 #include <filesystem>
@@ -8,13 +25,24 @@
 
 namespace fs = std::filesystem;
 
+// Path to the cMix client state directory.
 const fs::path STATE_PATH = "./statePathRecipient";
-const std::string NDF_URL =
-    "https://elixxir-bins.s3.us-west-1.amazonaws.com/ndf/mainnet.json";
-const fs::path CERT_PATH = "./mainnet.crt";
+
+// State directory password.
+const char *SECRET = "secret";
+
+// Reception identity storage key.
+const char *IDENTITY_STORAGE_KEY = "identityStorageKey";
+
+// Path to a local NDF.
 const fs::path NDF_PATH = "./mainnet.json";
 
-const char *SECRET = "secret";
+// URL from which to download the NDF if the local file is not available.
+const std::string NDF_URL =
+    "https://elixxir-bins.s3.us-west-1.amazonaws.com/ndf/mainnet.json";
+
+// Certificate for the online NDF.
+const fs::path CERT_PATH = "./mainnet.crt";
 
 // Read the contents of the file at the given path into the given string.
 //
@@ -42,10 +70,13 @@ bool dir_exists(const fs::path &path) {
 }
 
 int main() {
-  GoError err;
+  GoError err = NULL;
 
+  // Create the state directory if it does not exist.
   if (!dir_exists(STATE_PATH)) {
     std::string ndf;
+
+    // Download the NDF if it's not available.
     if (!read_file(NDF_PATH, ndf)) {
       std::cerr << "Failed to read NDF file, attempting to download..."
                 << std::endl;
@@ -65,7 +96,6 @@ int main() {
         return -1;
       }
 
-      std::cerr << "Downloaded NDF:\n" << downloaded_ndf << std::endl;
       ndf.assign(downloaded_ndf);
       free(downloaded_ndf);
     }
@@ -80,7 +110,8 @@ int main() {
     }
   }
 
-  CMix net;
+  // Load the cMix client.
+  Cmix net;
   err = xx_LoadCmix((char *)STATE_PATH.c_str(), (void *)SECRET, strlen(SECRET),
                     (char *)"", &net);
   if (err) {
@@ -88,4 +119,44 @@ int main() {
     free(err);
     return -1;
   }
+
+  // Load the reception identity, or create one if one doesn't already exist in
+  // the client store.
+  char *rid;
+  if ((err = cmix_LoadReceptionIdentity(net, (char *)IDENTITY_STORAGE_KEY,
+                                        &rid))) {
+    free(err);
+
+    if ((err = cmix_MakeReceptionIdentity(net, &rid))) {
+      std::cerr << "Failed to create new reception identity: " << err
+                << std::endl;
+      free(err);
+      return -1;
+    }
+
+    if ((err = cmix_StoreReceptionIdentity(net, (char *)IDENTITY_STORAGE_KEY,
+                                           rid))) {
+      std::cerr << "Failed to store new reception identity: " << err
+                << std::endl;
+      free(err);
+      return -1;
+    }
+  }
+
+  std::cout << "Reception ID: " << rid << std::endl;
+  void *contact;
+  int contact_len;
+  if ((err = rid_GetContact(rid, &contact, &contact_len))) {
+    std::cerr << "Failed to get contact info from reception identity: " << err << std::endl;
+    free(err);
+    return -1;
+  }
+
+  free(rid);
+  free(contact);
+  if (err) {
+    free(err);
+  }
+
+  return 0;
 }

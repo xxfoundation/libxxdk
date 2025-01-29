@@ -9,6 +9,9 @@
 
 #include <stdint.h>
 
+// A cMix instance ID.
+typedef int Cmix;
+
 typedef struct {
   int   len;
   void* data;
