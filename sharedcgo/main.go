@@ -11,6 +11,10 @@ package main
 #include <stdint.h>
 #include "callbacks.h"
 
+static void bridge_health_callback(cmix_status_callback_fn cb, int healthy, void *data) {
+	cb(healthy, data);
+}
+
 // below are the callbacks defined in callbacks.go
 
 extern long cmix_dm_receive(int dm_instance_id,
@@ -106,6 +110,20 @@ func makeBytes(s []byte) C.GoByteSlice {
 		len:  C.int(len(s)),
 		data: C.CBytes(s),
 	}
+}
+
+type healthCallback struct {
+	cb   C.cmix_status_callback_fn
+	data unsafe.Pointer
+}
+
+func (hcb healthCallback) Callback(healthy bool) {
+	intHealthy := 0
+	if healthy {
+		intHealthy = 1
+	}
+
+	C.bridge_health_callback(hcb.cb, C.int(intHealthy), hcb.data)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -219,17 +237,6 @@ func xx_LoadCmix(storageDir *C.char, password unsafe.Pointer, passwordLen C.int,
 	*out_cmix = C.Cmix(instance.GetID())
 	return nil
 }
-
-// func xx_MakeReceptionIdentity(cMix C.Cmix, out_rid *unsafe.Pointer, out_ridLen *C.int) C.GoError {
-// 	goCMix, err := bindings.GetCMixInstance(int(cMix))
-// 	if err != nil {
-// 		*out_rid = nil
-// 		*out_ridLen = 0
-// 		return makeError(err)
-// 	}
-
-// 	goRid = xxdk.MakeReceptionIdentity()
-// }
 
 // Get the current default reception ID for the given cMix instance.
 //
@@ -371,45 +378,74 @@ func cmix_EKVSet(cMix C.Cmix, key *C.char, value unsafe.Pointer, valueLen C.int)
 }
 
 //export cmix_StartNetworkFollower
-func cmix_StartNetworkFollower(cMixInstanceID int32, timeoutMS int) C.GoError {
-	cMix, err := bindings.GetCMixInstance(int(cMixInstanceID))
+func cmix_StartNetworkFollower(cmix C.Cmix, timeoutMS C.int) C.GoError {
+	goCmix, err := bindings.GetCMixInstance(int(cmix))
 	if err != nil {
 		return makeError(err)
 	}
-	return makeError(cMix.StartNetworkFollower(timeoutMS))
+	return makeError(goCmix.StartNetworkFollower(int(timeoutMS)))
 }
 
 //export cmix_StopNetworkFollower
-func cmix_StopNetworkFollower(cMixInstanceID int32) C.GoError {
-	cMix, err := bindings.GetCMixInstance(int(cMixInstanceID))
+func cmix_StopNetworkFollower(cmix C.Cmix) C.GoError {
+	goCmix, err := bindings.GetCMixInstance(int(cmix))
 	if err != nil {
 		return makeError(err)
 	}
-	return makeError(cMix.StopNetworkFollower())
+	return makeError(goCmix.StopNetworkFollower())
 }
 
 //export cmix_WaitForNetwork
-func cmix_WaitForNetwork(cMixInstanceID int32, timeoutMS int) C.GoError {
-	cMix, err := bindings.GetCMixInstance(int(cMixInstanceID))
+func cmix_WaitForNetwork(cmix C.Cmix, timeoutMS C.int) C.GoError {
+	goCmix, err := bindings.GetCMixInstance(int(cmix))
 	if err != nil {
 		return makeError(err)
 	}
-	ok := cMix.WaitForNetwork(timeoutMS)
+	ok := goCmix.WaitForNetwork(int(timeoutMS))
 	if !ok {
 		return makeError(errors.Errorf(
 			"Timed out waiting for network"))
 	}
-	return makeError(nil)
+	return nil
+}
+
+//export cmix_AddHealthCallback
+func cmix_AddHealthCallback(cmix C.Cmix, cb C.cmix_status_callback_fn, data unsafe.Pointer, out_id *C.long) C.GoError {
+	goCb := healthCallback{cb, data}
+
+	goCmix, err := bindings.GetCMixInstance(int(cmix))
+	if err != nil {
+		return makeError(err)
+	}
+
+	*out_id = C.long(goCmix.AddHealthCallback(goCb))
+
+	return nil
+}
+
+//export cmix_RemoveHealthCallback
+func cmix_RemoveHealthCallback(cmix C.Cmix, cbId C.long) C.GoError {
+	goCmix, err := bindings.GetCMixInstance(int(cmix))
+	if err != nil {
+		return makeError(err)
+	}
+
+	goCmix.RemoveHealthCallback(int64(cbId))
+
+	return nil
 }
 
 //export cmix_ReadyToSend
-func cmix_ReadyToSend(cMixInstanceID int32) bool {
-	cmix, err := bindings.GetCMixInstance(int(cMixInstanceID))
+func cmix_ReadyToSend(cmix C.Cmix) C.int {
+	goCmix, err := bindings.GetCMixInstance(int(cmix))
 	if err != nil {
 		jww.ERROR.Printf("%+v", err)
-		return false
+		return 0
 	}
-	return cmix.ReadyToSend()
+	if goCmix.ReadyToSend() {
+		return 1
+	}
+	return 0
 }
 
 ////////////////////////////////////////////////////////////////////////////////

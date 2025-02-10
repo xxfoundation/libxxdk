@@ -15,12 +15,11 @@
 //
 //   $ ./e2e_client
 
-#include "libxxdk.h"
+#include "common.h"
+#include "xxdk.h"
 #include <cstring>
 #include <filesystem>
-#include <fstream>
 #include <iostream>
-#include <sstream>
 #include <string>
 
 namespace fs = std::filesystem;
@@ -44,30 +43,7 @@ const std::string NDF_URL =
 // Certificate for the online NDF.
 const fs::path CERT_PATH = "./mainnet.crt";
 
-// Read the contents of the file at the given path into the given string.
-//
-// This will replace the contents of the string. Returns `true` on success and
-// false` on error.
-bool read_file(const fs::path &path, std::string &buf) {
-  std::ifstream stream(path, std::ios::in | std::ios::binary);
-  if (stream) {
-    std::ostringstream str;
-    str << stream.rdbuf();
-    buf.assign(str.str());
-    return true;
-  }
-
-  return false;
-}
-
-// Does the given path refer to a directory?
-//
-// Returns `false` if either there is no file at the given path, or if the file
-// at the given path is not a directory.
-bool dir_exists(const fs::path &path) {
-  auto stat = fs::status(path);
-  return fs::is_directory(stat);
-}
+const fs::path SENDER_CONTACT_PATH = "./myE2eContact.xxc";
 
 int main() {
   GoError err = NULL;
@@ -88,9 +64,8 @@ int main() {
       }
 
       char *downloaded_ndf;
-      err = xx_DownloadAndVerifySignedNdfWithUrl(
-          (char *)NDF_URL.c_str(), (char *)cert.c_str(), &downloaded_ndf);
-      if (err) {
+      if ((err = xx_DownloadAndVerifySignedNdfWithUrl(
+               NDF_URL.c_str(), cert.c_str(), &downloaded_ndf))) {
         std::cerr << "Failed to download NDF: " << err << std::endl;
         free(err);
         return -1;
@@ -100,9 +75,8 @@ int main() {
       free(downloaded_ndf);
     }
 
-    err = xx_NewCmix((char *)ndf.c_str(), (char *)STATE_PATH.c_str(),
-                     (void *)SECRET, strlen(SECRET), (char *)"");
-    if (err) {
+    if ((err = xx_NewCmix(ndf.c_str(), STATE_PATH.c_str(), (void *)SECRET,
+                          strlen(SECRET), ""))) {
       std::cerr << "Failed to initialize state:" << err << std::endl;
       free(err);
       fs::remove_all(STATE_PATH);
@@ -112,9 +86,8 @@ int main() {
 
   // Load the cMix client.
   Cmix net;
-  err = xx_LoadCmix((char *)STATE_PATH.c_str(), (void *)SECRET, strlen(SECRET),
-                    (char *)"", &net);
-  if (err) {
+  if ((err = xx_LoadCmix(STATE_PATH.c_str(), (void *)SECRET, strlen(SECRET), "",
+                         &net))) {
     std::cerr << "Failed to load state: " << err << std::endl;
     free(err);
     return -1;
@@ -123,22 +96,22 @@ int main() {
   // Load the reception identity, or create one if one doesn't already exist in
   // the client store.
   char *rid;
-  if ((err = cmix_LoadReceptionIdentity(net, (char *)IDENTITY_STORAGE_KEY,
-                                        &rid))) {
+  if ((err = cmix_LoadReceptionIdentity(net, IDENTITY_STORAGE_KEY, &rid))) {
     free(err);
 
     if ((err = cmix_MakeReceptionIdentity(net, &rid))) {
       std::cerr << "Failed to create new reception identity: " << err
                 << std::endl;
       free(err);
+      free(rid);
       return -1;
     }
 
-    if ((err = cmix_StoreReceptionIdentity(net, (char *)IDENTITY_STORAGE_KEY,
-                                           rid))) {
+    if ((err = cmix_StoreReceptionIdentity(net, IDENTITY_STORAGE_KEY, rid))) {
       std::cerr << "Failed to store new reception identity: " << err
                 << std::endl;
       free(err);
+      free(rid);
       return -1;
     }
   }
@@ -147,15 +120,38 @@ int main() {
   void *contact;
   int contact_len;
   if ((err = rid_GetContact(rid, &contact, &contact_len))) {
-    std::cerr << "Failed to get contact info from reception identity: " << err << std::endl;
+    std::cerr << "Failed to get contact info from reception identity: " << err
+              << std::endl;
     free(err);
+    free(rid);
     return -1;
   }
 
-  free(rid);
+  if (!write_file(SENDER_CONTACT_PATH, (const void *)contact,
+                  (size_t)contact_len)) {
+    std::cerr << "Warning: failed to write contact file " << SENDER_CONTACT_PATH
+              << std::endl;
+  }
+
   free(contact);
-  if (err) {
+
+  // TODO: Set up E2E client
+
+  if ((err = cmix_StartNetworkFollower(net, 5000))) {
+    std::cerr << "Failed to start network follower: " << err << std::endl;
     free(err);
+    free(rid);
+    return -1;
+  }
+
+  // TODO: Send messages
+
+  free(rid);
+
+  if ((err = cmix_StopNetworkFollower(net))) {
+    std::cerr << "Failed to stop network follower: " << err << std::endl;
+    free(err);
+    return -1;
   }
 
   return 0;

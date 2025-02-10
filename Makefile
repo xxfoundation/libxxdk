@@ -13,7 +13,7 @@
 # - CPPFLAGS (default empty)
 # 	C preprocessor flags
 #
-# - CXXFLAGS (default "-Wall -I. -I./sharedcgo")
+# - CXXFLAGS (default "-Wall -I.")
 # 	C++ compiler flags
 #
 # - LDFLAGS (default "-lxxdk -L. -Wl,-rpath,.")
@@ -27,11 +27,8 @@
 #
 # - LIBXXDK (default "libxxdk.dll" (windows) or "libxxdk.so" (others))
 # 	File name for the xxDK shared library output by Cgo
-#
-# - LIBXXDK_H (default "libxxdk.h")
-# 	File name for the xxDK header file output by Cgo
 
-CXXFLAGS ?= -Wall -I. -I./sharedcgo
+CXXFLAGS ?= -Wall -I.
 LDFLAGS ?= -lxxdk -L. -Wl,-rpath,.
 
 GOOS ?= linux
@@ -45,9 +42,9 @@ else
 	LIBXXDK ?= $(LIBXXDK_BASE:=.so)
 endif
 
-LIBXXDK_H ?= $(LIBXXDK_BASE:=.h)
+LIBXXDK_H := xxdk.h
 
-EXAMPLES_C := e2e_client
+EXAMPLES_C := e2e_client connect_server
 
 # DOTNET = xxdk.NET
 
@@ -60,8 +57,11 @@ sharedlib: $(LIBXXDK)
 
 examples-c: $(EXAMPLES_C)
 
-$(EXAMPLES_C): %: examples-c/%.o $(LIBXXDK)
-	$(CXX) $(LDFLAGS) $< -o $@
+$(EXAMPLES_C): %: examples-c/%.o examples-c/common.o $(LIBXXDK)
+	$(CXX) $(LDFLAGS) $< examples-c/common.o -o $@
+
+examples-c/common.o: examples-c/common.cpp examples-c/common.h
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 %.o: %.cpp $(LIBXXDK:.so=.h)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
@@ -72,7 +72,7 @@ $(LIBXXDK) $(LIBXXDK_H) &: $(GODEPS)
 clean:
 	rm -f examples-c/*.o
 	rm -f $(EXAMPLES_C)
-	rm -f $(LIBXXDK) $(LIBXXDK_H)
+	rm -f $(LIBXXDK) $(LIBXXDK:.so=.h)
 
 # libxxdk-win-x64.dll: $(GODEPS)
 # 	CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build -buildmode=c-shared -o $@ ./sharedcgo

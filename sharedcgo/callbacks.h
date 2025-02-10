@@ -26,6 +26,8 @@ typedef struct {
 // allocated with `malloc`; the caller should arrange to `free` it.
 typedef char *GoError;
 
+typedef void (*cmix_status_callback_fn)(int, void *);
+
 typedef long (* cmix_dm_receive_fn)(int dm_instance_id,
   void* message_id, int message_id_len,
   char* nickname, int nickname_len,

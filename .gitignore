@@ -409,4 +409,9 @@ xxdk-rs/target
 
 # C/C++ build artifacts
 *.o
+/libxxdk.h
 /e2e_client
+/connect_server
+
+# Example outputs
+*.xxc
