@@ -413,5 +413,7 @@ xxdk-rs/target
 /e2e_client
 /connect_server
 
-# Example outputs
+# Example and test outputs
 *.xxc
+ignore.*/
+tests-c/*.out

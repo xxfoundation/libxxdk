@@ -1,9 +1,11 @@
 ### Targets:
 #
-# all (default target): build shared library, header file, and all examples
-# sharedlib: build xxDK shared library and header file
-# examples-c: build all C examples
-# clean: remove all build artifacts
+# - all (default target): build shared library and all examples; build and run all test suites
+# - sharedlib: build xxDK shared library
+# - examples-c: build all C/C++ examples
+# - tests-c: build (but don't run) all C/C++ test suites
+# - test: build and run all test suites
+# - clean: remove all build artifacts
 #
 ### Configurable variables:
 #
@@ -45,34 +47,46 @@ endif
 LIBXXDK_H := xxdk.h
 
 EXAMPLES_C := e2e_client connect_server
+TESTS_C := health_callbacks
 
 # DOTNET = xxdk.NET
 
 GODEPS := $(addprefix sharedcgo/,main.go callbacks.h callbacks.go rpc.go)
 
-.PHONY: all sharedlib examples-c clean #windows-x64 windows-arm64 linux-x64 linux-arm64 darwin-x64 darwin-arm64 dotnet
+.PHONY: all sharedlib examples-c tests-c $(TESTS_C) test clean #windows-x64 windows-arm64 linux-x64 linux-arm64 darwin-x64 darwin-arm64 dotnet
 
-all: sharedlib examples-c
+all: sharedlib examples-c test
 sharedlib: $(LIBXXDK)
 
 examples-c: $(EXAMPLES_C)
+tests-c: $(TESTS_C:%=tests-c/%.out)
 
 $(EXAMPLES_C): %: examples-c/%.o examples-c/common.o $(LIBXXDK)
 	$(CXX) $(LDFLAGS) $< examples-c/common.o -o $@
 
-examples-c/common.o: examples-c/common.cpp examples-c/common.h
+examples-c/common.o: examples-c/common.cpp examples-c/common.h $(LIBXXDK_H)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 %.o: %.cpp $(LIBXXDK_H)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
+$(TESTS_C:%=tests-c/%.out): %.out: %.cpp tests-c/common.h tests-c/acutest.h $(LIBXXDK) $(LIBXXDK_H)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) $< -o $@
+
+$(TESTS_C): %: tests-c/%.out
+	-echo Running test suite $@
+	./tests-c/$@.out
+
 $(LIBXXDK): $(GODEPS)
 	CGO_ENABLED=1 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -buildmode=c-shared -o $@ ./sharedcgo
+
+test: $(TESTS_C)
 
 clean:
 	rm -f examples-c/*.o
 	rm -f $(EXAMPLES_C)
 	rm -f $(LIBXXDK) $(LIBXXDK:.so=.h)
+	rm -f $(TESTS_C:%=tests-c/%.out)
 
 # libxxdk-win-x64.dll: $(GODEPS)
 # 	CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build -buildmode=c-shared -o $@ ./sharedcgo
