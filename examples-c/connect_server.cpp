@@ -16,43 +16,8 @@ const std::string IDENTITY_STORAGE_KEY = "identityStorageKey";
 int main() {
   GoError err = NULL;
 
-  if (!dir_exists(STATE_PATH)) {
-    std::string ndf;
-
-    if (!read_file(NDF_PATH, ndf)) {
-      std::cerr << "Failed to read NDF file, attempting download..." << std::endl;
-
-      std::string cert;
-      if (!read_file(CERT_PATH, cert)) {
-        std::cerr << "Failed to read certificate file" << std::endl;
-        return -1;
-      }
-
-      char *downloaded_ndf;
-      if ((err = xx_DownloadAndVerifySignedNdfWithUrl(NDF_URL.c_str(), cert.c_str(), &downloaded_ndf))) {
-        std::cerr << "Failed to download NDF: " << err << std::endl;
-        free(err);
-        return -1;
-      }
-
-      ndf.assign(downloaded_ndf);
-      free(downloaded_ndf);
-    }
-
-    if ((err = xx_NewCmix(ndf.c_str(), STATE_PATH.c_str(), (void *)SECRET.c_str(), SECRET.length(), ""))) {
-      std::cerr << "Failed to initialize Cmix state: " << err << std::endl;
-      free(err);
-      fs::remove_all(STATE_PATH);
-      return -1;
-    }
-  }
-
-  Cmix net;
-  if ((err = xx_LoadCmix(STATE_PATH.c_str(), (void *)SECRET.c_str(), SECRET.length(), "", &net))) {
-    std::cerr << "Failed to load state: " << err << std::endl;
-    free(err);
-    return -1;
-  }
+  // Implemented in common.cpp
+  Cmix net = load_cmix_state(STATE_PATH, SECRET, NDF_PATH, NDF_URL, CERT_PATH);
 
   char *rid;
   if ((err = cmix_LoadReceptionIdentity(net, IDENTITY_STORAGE_KEY.c_str(), &rid))) {

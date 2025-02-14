@@ -63,10 +63,10 @@ $(EXAMPLES_C): %: examples-c/%.o examples-c/common.o $(LIBXXDK)
 examples-c/common.o: examples-c/common.cpp examples-c/common.h
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
-%.o: %.cpp $(LIBXXDK:.so=.h)
+%.o: %.cpp $(LIBXXDK_H)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
-$(LIBXXDK) $(LIBXXDK_H) &: $(GODEPS)
+$(LIBXXDK): $(GODEPS)
 	CGO_ENABLED=1 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -buildmode=c-shared -o $@ ./sharedcgo
 
 clean:

@@ -48,50 +48,8 @@ const fs::path SENDER_CONTACT_PATH = "./myE2eContact.xxc";
 int main() {
   GoError err = NULL;
 
-  // Create the state directory if it does not exist.
-  if (!dir_exists(STATE_PATH)) {
-    std::string ndf;
-
-    // Download the NDF if it's not available.
-    if (!read_file(NDF_PATH, ndf)) {
-      std::cerr << "Failed to read NDF file, attempting to download..."
-                << std::endl;
-
-      std::string cert;
-      if (!read_file(CERT_PATH, cert)) {
-        std::cerr << "Failed to read certificate file" << std::endl;
-        return -1;
-      }
-
-      char *downloaded_ndf;
-      if ((err = xx_DownloadAndVerifySignedNdfWithUrl(
-               NDF_URL.c_str(), cert.c_str(), &downloaded_ndf))) {
-        std::cerr << "Failed to download NDF: " << err << std::endl;
-        free(err);
-        return -1;
-      }
-
-      ndf.assign(downloaded_ndf);
-      free(downloaded_ndf);
-    }
-
-    if ((err = xx_NewCmix(ndf.c_str(), STATE_PATH.c_str(), (void *)SECRET,
-                          strlen(SECRET), ""))) {
-      std::cerr << "Failed to initialize state:" << err << std::endl;
-      free(err);
-      fs::remove_all(STATE_PATH);
-      return -1;
-    }
-  }
-
-  // Load the cMix client.
-  Cmix net;
-  if ((err = xx_LoadCmix(STATE_PATH.c_str(), (void *)SECRET, strlen(SECRET), "",
-                         &net))) {
-    std::cerr << "Failed to load state: " << err << std::endl;
-    free(err);
-    return -1;
-  }
+  // Implemented in common.cpp
+  Cmix net = load_cmix_state(STATE_PATH, SECRET, NDF_PATH, NDF_URL, CERT_PATH);
 
   // Load the reception identity, or create one if one doesn't already exist in
   // the client store.
@@ -116,7 +74,6 @@ int main() {
     }
   }
 
-  std::cout << "Reception ID: " << rid << std::endl;
   void *contact;
   int contact_len;
   if ((err = rid_GetContact(rid, &contact, &contact_len))) {
