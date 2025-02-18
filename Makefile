@@ -88,7 +88,7 @@ clean:
 	rm -f $(EXAMPLES_C)
 	rm -f $(LIBXXDK) $(LIBXXDK:.so=.h)
 	rm -f $(TESTS_C:%=tests-c/%.out)
-	rm -rf $(TESTS_STATE_PREFIX)*/
+	rm -rf $(TESTS_STATE_PREFIX)*
 
 # libxxdk-win-x64.dll: $(GODEPS)
 # 	CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build -buildmode=c-shared -o $@ ./sharedcgo

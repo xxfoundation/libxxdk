@@ -1,11 +1,35 @@
 #ifndef TESTS_COMMON_H
 #define TESTS_COMMON_H
 
-#include "acutest.h"
-#include "xxdk.h"
-
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
+
+#include "xxdk.h"
+
+static FILE *LOG_FILE;
+
+static void init_xxdk_log(const char *test_name) {
+  static const char *LOG_PREFIX = "ignore.log.";
+
+  xx_DisableStdoutLog();
+
+  std::string file_name{LOG_PREFIX};
+  file_name += test_name;
+
+  LOG_FILE = fopen(file_name.c_str(), "w");
+  xx_SetLogFile(LOG_FILE);
+}
+
+static void fini_xxdk_log() {
+  xx_ResetLogger();
+  fclose(LOG_FILE);
+}
+
+#define TEST_INIT init_xxdk_log(test_name)
+#define TEST_FINI fini_xxdk_log()
+
+#include "acutest.h"
 
 namespace fs = std::filesystem;
 

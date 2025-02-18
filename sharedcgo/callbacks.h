@@ -7,6 +7,7 @@
 #ifndef CALLBACKS_H
 #define CALLBACKS_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 // A cMix instance ID.
@@ -27,6 +28,7 @@ typedef struct {
 typedef char *GoError;
 
 typedef void (*cmix_status_callback_fn)(int, void *);
+typedef size_t (*xx_log_output_fn)(void *, const void *, size_t);
 
 typedef long (* cmix_dm_receive_fn)(int dm_instance_id,
   void* message_id, int message_id_len,

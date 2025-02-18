@@ -10,10 +10,17 @@ package main
 /*
 #include <stdint.h>
 #include "callbacks.h"
+#include <stdio.h>
 
 static void bridge_health_callback(cmix_status_callback_fn cb, int healthy, void *data) {
 	cb(healthy, data);
 }
+
+static size_t bridge_log_output(xx_log_output_fn log, void *logger_data, const void *data, size_t data_len) {
+	return log(logger_data, data, data_len);
+}
+
+size_t file_logger(void *file, const void *data, size_t data_len);
 
 // below are the callbacks defined in callbacks.go
 
@@ -84,6 +91,8 @@ import "C"
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"unsafe"
 
 	"github.com/pkg/errors"
@@ -124,6 +133,53 @@ func (hcb healthCallback) Callback(healthy bool) {
 	}
 
 	C.bridge_health_callback(hcb.cb, C.int(intHealthy), hcb.data)
+}
+
+type cLogger struct {
+	log  C.xx_log_output_fn
+	data unsafe.Pointer
+}
+
+func (logger *cLogger) Write(p []byte) (int, error) {
+	p_len := C.size_t(len(p))
+	n, err := C.bridge_log_output(logger.log, logger.data, unsafe.Pointer(&p[0]), p_len)
+	if n < p_len {
+		return int(n), err
+	}
+
+	return int(n), nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//                                                                            //
+// xxDK Logging Configuration                                                 //
+//                                                                            //
+////////////////////////////////////////////////////////////////////////////////
+
+//export xx_SetLogger
+func xx_SetLogger(loggerFn C.xx_log_output_fn, loggerData unsafe.Pointer) {
+	logger := cLogger{loggerFn, loggerData}
+	jww.SetLogOutput(&logger)
+}
+
+//export xx_SetLogFile
+func xx_SetLogFile(file *C.FILE) {
+	xx_SetLogger(C.xx_log_output_fn(C.file_logger), unsafe.Pointer(file))
+}
+
+//export xx_ResetLogger
+func xx_ResetLogger() {
+	jww.SetLogOutput(io.Discard)
+}
+
+//export xx_DisableStdoutLog
+func xx_DisableStdoutLog() {
+	jww.SetStdoutOutput(io.Discard)
+}
+
+//export xx_EnableStdoutLog
+func xx_EnableStdoutLog() {
+	jww.SetStdoutOutput(os.Stdout)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

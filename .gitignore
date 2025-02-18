@@ -412,8 +412,8 @@ xxdk-rs/target
 /libxxdk.h
 /e2e_client
 /connect_server
+tests-c/*.out
 
 # Example and test outputs
 *.xxc
-ignore.*/
-tests-c/*.out
+ignore.*

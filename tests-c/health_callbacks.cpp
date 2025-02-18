@@ -1,4 +1,3 @@
-#include "acutest.h"
 #include "common.h"
 #include "xxdk.h"
 #include <chrono>
@@ -20,7 +19,7 @@ void callback(int status, void *data) {
   cb_stat->cv.notify_all();
 }
 
-void test_callback() {
+void health_callback() {
   const fs::path STATE_DIR{"ignore.test_callback"};
 
   Cmix net = setup_test_instance(STATE_DIR);
@@ -48,7 +47,8 @@ void test_callback() {
     auto now = std::chrono::system_clock::now();
     auto deadline = now + std::chrono::seconds{30};
     while (!cb_stat.status) {
-      if (!TEST_CHECK(std::cv_status::no_timeout == cb_stat.cv.wait_until(lk, deadline))) {
+      if (!TEST_CHECK(std::cv_status::no_timeout ==
+                      cb_stat.cv.wait_until(lk, deadline))) {
         TEST_MSG("Timed out waiting for health callback");
         break;
       }
@@ -66,4 +66,4 @@ void test_callback() {
   }
 }
 
-TEST_LIST = {{"test_callback", test_callback}, {NULL, NULL}};
+TEST_LIST = {{"health_callback", health_callback}, {NULL, NULL}};

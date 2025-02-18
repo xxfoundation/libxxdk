@@ -5,6 +5,9 @@
 extern "C" {
 #endif
 
+#include <stddef.h>
+#include <stdio.h>
+
 // A Cmix instance ID.
 typedef int Cmix;
 
@@ -21,8 +24,70 @@ typedef char *GoError;
 
 // Network status callback functions.
 //
-// See [`cmix_AddHealthCallback`] for more information.
-typedef void (*cmix_status_callback_fn)(int, void *);
+// See `cmix_AddHealthCallback` for more information.
+typedef void (*cmix_status_callback_fn)(int networkStatus, void *userData);
+
+// xxDK logging output callback functions.
+//
+// See `xx_SetLogger` for more information.
+typedef size_t (*xx_log_output_fn)(void *loggerData, const void *data,
+                                   size_t dataLen);
+
+// Set the xxDK log output callback.
+//
+// By default, xxDK will write log output to standard output. It can
+// additionally write it to a user-configured logging system by means of this
+// function.
+//
+// This will replace any log output previously set by either `xx_SetLogger` or
+// `xx_SetLogFile`. If logs should be written to multiple outputs, the callback
+// set here must handle each output.
+//
+// This function is intended to allow integration of xxDK logs into other
+// logging systems. To simply write log output to a file, see `xx_SetLogFile`.
+//
+// For each message logged by xxDK, `loggerFn` will be called with the
+// following arguments:
+//
+// - The `loggerData` pointer given here;
+// - A pointer to the bytes of the logged message;
+// - The byte length of the logged message.
+//
+// The callback must not retain the log message pointer, nor modify the memory
+// to which it points.
+//
+// If `loggerFn` accesses `loggerData`, then `loggerData` should remain valid
+// until either the process exits or `xx_ResetLogger` is called to clear the
+// configured logger.
+void xx_SetLogger(xx_log_output_fn loggerFn, void *loggerData);
+
+// Set the xxDK log file.
+//
+// By default, xxDK will write log output to standard output. To additionally
+// write it to a file, use this function.
+//
+// This will replace any log output previously set by either `xx_SetLogger` or
+// `xx_SetLogFile`. If logs should be written to multiple outputs, use
+// `xx_SetLogger` with a callback that handles each output.
+//
+// The given file must be opened for writing, and must remain valid until either
+// the process exits or `xx_ResetLogger` is called to clear the configured
+// logger.
+void xx_SetLogFile(FILE *file);
+
+// Clear the configured xxDK log output.
+//
+// This will clear any log output previously configured by either `xx_SetLogger`
+// or `xx_SetLogFile`.
+void xx_ResetLogger();
+
+// Disable writing of xxDK logs to standard output.
+void xx_DisableStdoutLog();
+
+// Enable writing of xxDK logs to standard output.
+//
+// This is the default state of the library when loaded.
+void xx_EnableStdoutLog();
 
 // Get the xxDK version string.
 //

@@ -1,4 +1,3 @@
-#include "acutest.h"
 #include "common.h"
 #include "xxdk.h"
 #include <cstring>
@@ -36,7 +35,7 @@ void raw_ekv_roundtrip() {
     return;
   }
 
-  TEST_CHECK(strcmp(data, out_data) == 0);
+  TEST_CHECK(strncmp(data, out_data, out_data_len) == 0);
   TEST_MSG("Retrieved EKV value (\"%s\") does not match stored value (\"%s\")",
            out_data, data);
 
