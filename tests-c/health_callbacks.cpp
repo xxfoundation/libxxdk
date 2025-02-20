@@ -32,13 +32,11 @@ void health_callback() {
   if (!TEST_CHECK(
           !(err = cmix_AddHealthCallback(net, callback, &cb_stat, &cb_id)))) {
     TEST_MSG("Failed to add health callback: %s", err);
-    free(err);
     return;
   }
 
   if (!TEST_CHECK(!(err = cmix_StartNetworkFollower(net, 5000)))) {
     TEST_MSG("Failed to start network follower: %s", err);
-    free(err);
     return;
   }
 
@@ -57,12 +55,10 @@ void health_callback() {
 
   if (!TEST_CHECK(!(err = cmix_RemoveHealthCallback(net, cb_id)))) {
     TEST_MSG("Failed to remove network health callback: %s", err);
-    free(err);
   }
 
   if (!TEST_CHECK(!(err = cmix_StopNetworkFollower(net)))) {
     TEST_MSG("Failed to stop network follower: %s", err);
-    free(err);
   }
 }
 

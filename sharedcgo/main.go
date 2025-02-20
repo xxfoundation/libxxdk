@@ -12,11 +12,11 @@ package main
 #include "callbacks.h"
 #include <stdio.h>
 
-static void bridge_health_callback(cmix_status_callback_fn cb, int healthy, void *data) {
+static inline void bridge_health_callback(cmix_status_callback_fn cb, int healthy, void *data) {
 	cb(healthy, data);
 }
 
-static size_t bridge_log_output(xx_log_output_fn log, void *logger_data, const void *data, size_t data_len) {
+static inline size_t bridge_log_output(xx_log_output_fn log, void *logger_data, const void *data, size_t data_len) {
 	return log(logger_data, data, data_len);
 }
 
@@ -105,10 +105,14 @@ import (
 	"gitlab.com/xx_network/crypto/csprng"
 )
 
+func setInfoString(s []byte) *C.char {
+	return C.set_info_string(unsafe.Pointer(&s[0]), C.size_t(len(s)))
+}
+
 func makeError(e error) C.GoError {
 	if e != nil {
 		msg := fmt.Sprintf("%+v", e)
-		return C.CString(msg)
+		return setInfoString([]byte(msg))
 	}
 
 	return nil
@@ -188,31 +192,19 @@ func xx_EnableStdoutLog() {
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
-// Get the xxDK version string.
-//
-// The string is allocated on the C heap with malloc. The caller should arrange for it to be freed.
-//
 //export xx_GetVersion
 func xx_GetVersion() *C.char {
-	return C.CString(xxdk.SEMVER)
+	return setInfoString([]byte(xxdk.SEMVER))
 }
 
-// Get the xxDK git version string.
-//
-// The string is allocated on the C heap with malloc. The caller should arrange for it to be freed.
-//
 //export xx_GetGitVersion
 func xx_GetGitVersion() *C.char {
-	return C.CString(xxdk.GITVERSION)
+	return setInfoString([]byte(xxdk.GITVERSION))
 }
 
-// Get the xxDK dependencies string.
-//
-// The string is allocated on the C heap with malloc. The caller should arrange for it to be freed.
-//
 //export xx_GetDependencies
 func xx_GetDependencies() *C.char {
-	return C.CString(xxdk.DEPENDENCIES)
+	return setInfoString([]byte(xxdk.DEPENDENCIES))
 }
 
 // Attempt to download an NDF from a specified URL.

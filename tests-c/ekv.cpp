@@ -13,7 +13,6 @@ void raw_ekv_roundtrip() {
   if (!TEST_CHECK(
           !(err = cmix_EKVSet(net, key, (void *)data, strlen(data) + 1)))) {
     TEST_MSG("Failed to set EKV value: %s", err);
-    free(err);
     return;
   }
 
@@ -23,7 +22,6 @@ void raw_ekv_roundtrip() {
   if (!TEST_CHECK(
           !(err = cmix_EKVGet(net, key, (void **)&out_data, &out_data_len)))) {
     TEST_MSG("Failed to get EKV value: %s", err);
-    free(err);
     return;
   }
 
@@ -51,13 +49,11 @@ void rid_ekv_roundtrip() {
 
   if (!TEST_CHECK(!(err = cmix_MakeReceptionIdentity(net, &rid)))) {
     TEST_MSG("Failed to create RID: %s", err);
-    free(err);
     return;
   }
 
   if (!TEST_CHECK(!(err = cmix_StoreReceptionIdentity(net, key, rid)))) {
     TEST_MSG("Failed to store RID: %s", err);
-    free(err);
     free(rid);
     return;
   }
@@ -65,7 +61,6 @@ void rid_ekv_roundtrip() {
   char *out_rid;
   if (!TEST_CHECK(!(err = cmix_LoadReceptionIdentity(net, key, &out_rid)))) {
     TEST_MSG("Failed to load RID: %s", err);
-    free(err);
     free(rid);
     return;
   }

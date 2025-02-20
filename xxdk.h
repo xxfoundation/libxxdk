@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 
 // A Cmix instance ID.
@@ -16,11 +17,14 @@ typedef int Cmix;
 // xxDK functions that may fail return `GoError`, and return their other results
 // via out parameters.
 //
-// `GoError` is a typedef for `char *`. If a function returning `GoError` is
-// successful, it will return null. Otherwise, it will return a null-terminated
-// string representing a human-readable error message. This string will be
-// allocated using `malloc`; the caller should arrange to free it.
-typedef char *GoError;
+// `GoError` is a typedef for `const char *`. If a function returning `GoError`
+// is successful, it will return NULL. Otherwise, it will return a
+// null-terminated string representing a human-readable error message. This
+// string is allocated in thread-local storage managed by xxDK, and will be
+// overwritten by subsequent error strings or calls to `xx_GetVersion()`,
+// `xx_GetGitVersion()`, or `xx_GetDependencies()`. It should not be retained,
+// modified, or freed by the user.
+typedef const char *GoError;
 
 // Network status callback functions.
 //
@@ -91,21 +95,27 @@ void xx_EnableStdoutLog();
 
 // Get the xxDK version string.
 //
-// The string is allocated on the C heap with malloc. The caller should arrange
-// for it to be freed.
-char *xx_GetVersion();
+// The string is allocated in thread-local storage managed by xxDK, and may be
+// overwritten or reallocated by subsequent calls to `xx_GetVersion()`,
+// `xx_GetGitVersion()`, `xx_GetDependencies()`, or any function that returns a
+// `GoError`. It should not be retained, modified, or freed by the user.
+const char *xx_GetVersion();
 
 // Get the xxDK git version string.
 //
-// The string is allocated on the C heap with malloc. The caller should arrange
-// for it to be freed.
-char *xx_GetGitVersion();
+// The string is allocated in thread-local storage managed by xxDK, and may be
+// overwritten or reallocated by subsequent calls to `xx_GetVersion()`,
+// `xx_GetGitVersion()`, `xx_GetDependencies()`, or any function that returns a
+// `GoError`. It should not be retained, modified, or freed by the user.
+const char *xx_GetGitVersion();
 
 // Get the xxDK dependencies string.
 //
-// The string is allocated on the C heap with malloc. The caller should arrange
-// for it to be freed.
-char *xx_GetDependencies();
+// The string is allocated in thread-local storage managed by xxDK, and may be
+// overwritten or reallocated by subsequent calls to `xx_GetVersion()`,
+// `xx_GetGitVersion()`, `xx_GetDependencies()`, or any function that returns a
+// `GoError`. It should not be retained, modified, or freed by the user.
+const char *xx_GetDependencies();
 
 // Attempt to download an NDF from a specified URL.
 //

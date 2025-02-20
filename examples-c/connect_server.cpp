@@ -21,18 +21,14 @@ int main() {
 
   char *rid;
   if ((err = cmix_LoadReceptionIdentity(net, IDENTITY_STORAGE_KEY.c_str(), &rid))) {
-    free(err);
-
     if ((err = cmix_MakeReceptionIdentity(net, &rid))) {
       std::cerr << "Failed to create new reception identity: " << err << std::endl;
-      free(err);
       free(rid);
       return -1;
     }
 
     if ((err = cmix_StoreReceptionIdentity(net, IDENTITY_STORAGE_KEY.c_str(), rid))) {
       std::cerr << "Failed to store new reception identity: " << err << std::endl;
-      free(err);
       free(rid);
       return -1;
     }
@@ -42,7 +38,6 @@ int main() {
   int contact_len;
   if ((err = rid_GetContact(rid, &contact, &contact_len))) {
     std::cerr << "Failed to get contact info from reception identity: " << err << std::endl;
-    free(err);
     free(rid);
     return -1;
   }
@@ -57,7 +52,6 @@ int main() {
 
   if ((err = cmix_StartNetworkFollower(net, 5000))) {
     std::cerr << "Failed to start network follower: " << err << std::endl;
-    free(err);
     free(rid);
     return -1;
   }
@@ -68,7 +62,6 @@ int main() {
 
   if ((err = cmix_StopNetworkFollower(net))) {
     std::cerr << "Failed to stop network follower: " << err << std::endl;
-    free(err);
     return -1;
   }
 

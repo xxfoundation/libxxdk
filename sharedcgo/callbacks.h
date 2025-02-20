@@ -18,17 +18,20 @@ typedef struct {
   void* data;
 } GoByteSlice;
 
-// xxDK functions that may fail have `GoError` as their return type, and pass
-// their other results via out parameters.
-//
-// `GoError` is a typedef for `char *`. If a function returning `GoError`
-// returns successfully, it will return null. Otherwise, it will return a
-// null-terminated string representing an error message. The string will be
-// allocated with `malloc`; the caller should arrange to `free` it.
 typedef char *GoError;
-
 typedef void (*cmix_status_callback_fn)(int, void *);
 typedef size_t (*xx_log_output_fn)(void *, const void *, size_t);
+
+// Set and return the thread-local info string.
+//
+// This will lazily initialize the string for the current thread, and overwrite
+// any previous contents. It may also reallocate the string's buffer, if more
+// space is required for the given contents.
+//
+// The given len should be the byte length of the contents ignoring any
+// terminating null byte. This function will add a terminating null byte to the
+// thread-local string after copying the given contents.
+const char *set_info_string(const void *contents, size_t new_len);
 
 typedef long (* cmix_dm_receive_fn)(int dm_instance_id,
   void* message_id, int message_id_len,

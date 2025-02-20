@@ -63,7 +63,6 @@ Cmix load_cmix_state(const fs::path &state_path,
       if ((err = xx_DownloadAndVerifySignedNdfWithUrl(
                ndf_url.c_str(), cert.c_str(), &downloaded_ndf))) {
         std::cerr << "Failed to download NDF: " << err << std::endl;
-        free(err);
         fs::remove_all(state_path);
         std::exit(EXIT_FAILURE);
       }
@@ -76,7 +75,6 @@ Cmix load_cmix_state(const fs::path &state_path,
              xx_NewCmix(ndf.c_str(), state_path.c_str(), state_password.data(),
                         state_password.length(), ""))) {
       std::cerr << "Failed to initialize new Cmix state: " << err << std::endl;
-      free(err);
       fs::remove_all(state_path);
       std::exit(EXIT_FAILURE);
     }
@@ -87,7 +85,6 @@ Cmix load_cmix_state(const fs::path &state_path,
   if ((err = xx_LoadCmix(state_path.c_str(), state_password.data(),
                          state_password.length(), "", &net))) {
     std::cerr << "Failed to load Cmix state: " << err << std::endl;
-    free(err);
     std::exit(EXIT_FAILURE);
   }
 

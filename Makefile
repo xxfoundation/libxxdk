@@ -52,7 +52,7 @@ TESTS_STATE_PREFIX := ignore.
 
 # DOTNET = xxdk.NET
 
-GODEPS := $(addprefix sharedcgo/,main.go callbacks.h callbacks.go rpc.go)
+GODEPS := $(addprefix sharedcgo/,main.go callbacks.h callbacks.c callbacks.go rpc.go)
 
 .PHONY: all sharedlib examples-c tests-c $(TESTS_C) test clean #windows-x64 windows-arm64 linux-x64 linux-arm64 darwin-x64 darwin-arm64 dotnet
 

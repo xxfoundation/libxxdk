@@ -59,7 +59,6 @@ static Cmix setup_test_instance(const fs::path &state_dir) {
                                PASSWORD.length(), "")))) {
       TEST_MSG("failed to create test Cmix storage dir %s: %s",
                state_dir.c_str(), err);
-      free(err);
       fs::remove_all(state_dir);
       TEST_ASSERT(false);
     }
@@ -70,7 +69,6 @@ static Cmix setup_test_instance(const fs::path &state_dir) {
                                       PASSWORD.length(), "", &net)))) {
     TEST_MSG("failed to load test Cmix from storage dir %s: %s",
              state_dir.c_str(), err);
-    free(err);
     TEST_ASSERT(false);
   }
 
