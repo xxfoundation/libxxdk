@@ -2,10 +2,13 @@
 #define TESTS_COMMON_H
 
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 
 #include "xxdk.h"
+
+const static char *DEFAULT_NDF_PATH = "ndf.json";
 
 static FILE *LOG_FILE;
 
@@ -44,15 +47,23 @@ static std::string read_file(const fs::path &path) {
   return str.str();
 }
 
+static fs::path get_test_ndf_path() {
+  const char *env_path = getenv("XX_TEST_NDF_PATH");
+  if (!env_path) {
+    return fs::path{DEFAULT_NDF_PATH};
+  }
+
+  return fs::path{env_path};
+}
+
 static Cmix setup_test_instance(const fs::path &state_dir) {
-  static const fs::path NDF_PATH{"ndf.json"};
   static const std::string PASSWORD{"testpass"};
 
   GoError err;
 
   auto stat = fs::status(state_dir);
   if (!fs::is_directory(stat)) {
-    auto ndf = read_file(NDF_PATH);
+    auto ndf = read_file(get_test_ndf_path());
 
     if (!TEST_CHECK(
             !(err = xx_NewCmix(ndf.c_str(), state_dir.c_str(), PASSWORD.data(),
