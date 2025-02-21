@@ -45,7 +45,7 @@ static std::string read_file(const fs::path &path) {
 }
 
 static Cmix setup_test_instance(const fs::path &state_dir) {
-  static const fs::path NDF_PATH{"tests-c/mainnet.json"};
+  static const fs::path NDF_PATH{"ndf.json"};
   static const std::string PASSWORD{"testpass"};
 
   GoError err;

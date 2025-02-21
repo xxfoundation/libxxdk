@@ -54,7 +54,7 @@ TESTS_STATE_PREFIX := ignore.
 
 GODEPS := $(addprefix sharedcgo/,main.go callbacks.h callbacks.c callbacks.go rpc.go)
 
-.PHONY: all sharedlib examples-c tests-c $(TESTS_C) test clean #windows-x64 windows-arm64 linux-x64 linux-arm64 darwin-x64 darwin-arm64 dotnet
+.PHONY: all sharedlib examples-c tests-c test clean #windows-x64 windows-arm64 linux-x64 linux-arm64 darwin-x64 darwin-arm64 dotnet
 
 all: sharedlib examples-c test
 sharedlib: $(LIBXXDK)
@@ -74,14 +74,11 @@ examples-c/common.o: examples-c/common.cpp examples-c/common.h $(LIBXXDK_H)
 $(TESTS_C:%=tests-c/%.out): %.out: %.cpp tests-c/common.h tests-c/acutest.h $(LIBXXDK) $(LIBXXDK_H)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) $< -o $@
 
-$(TESTS_C): %: tests-c/%.out
-	-echo Running test suite $@
-	./tests-c/$@.out
-
 $(LIBXXDK): $(GODEPS)
 	CGO_ENABLED=1 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -buildmode=c-shared -o $@ ./sharedcgo
 
-test: $(TESTS_C)
+test: $(TESTS_C:%=tests-c/%.out)
+	./run_tests.sh $^
 
 clean:
 	rm -f examples-c/*.o
