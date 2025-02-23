@@ -9,18 +9,8 @@ package main
 
 /*
 #include <stdint.h>
-#include "callbacks.h"
+#include "c_impl.h"
 #include <stdio.h>
-
-static inline void bridge_health_callback(cmix_status_callback_fn cb, int healthy, void *data) {
-	cb(healthy, data);
-}
-
-static inline size_t bridge_log_output(xx_log_output_fn log, void *logger_data, const void *data, size_t data_len) {
-	return log(logger_data, data, data_len);
-}
-
-size_t file_logger(void *file, const void *data, size_t data_len);
 
 // below are the callbacks defined in callbacks.go
 

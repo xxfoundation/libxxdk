@@ -8,7 +8,7 @@
 package main
 
 // #include <stdint.h>
-// #include "callbacks.h"
+// #include "c_impl.h"
 // #cgo CFLAGS: -I .
 //
 // DMReceiverRouterFunctions DMReceiverRouter;

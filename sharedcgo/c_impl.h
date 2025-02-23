@@ -1,11 +1,8 @@
-/////////////////////////////////////////////////////////////////////////////
-//                                                                         //
-// Direct Messaging Callbacks (you must implement these)                   //
-//                                                                         //
-/////////////////////////////////////////////////////////////////////////////
+// C definitions used across Go files, and for C implementations of necessary
+// library functionality.
 
-#ifndef CALLBACKS_H
-#define CALLBACKS_H
+#ifndef C_IMPL_H
+#define C_IMPL_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -13,16 +10,13 @@
 // A cMix instance ID.
 typedef int Cmix;
 
-typedef struct {
-  int   len;
-  void* data;
-} GoByteSlice;
+// ========================================================
+// Info/error strings
 
-typedef char *GoError;
-typedef void (*cmix_status_callback_fn)(int, void *);
-typedef size_t (*xx_log_output_fn)(void *, const void *, size_t);
+// Error strings. Should always be pointers to the thread-local info string.
+typedef const char *GoError;
 
-// Set and return the thread-local info string.
+// Set the thread-local info string's contents and return a pointer to it.
 //
 // This will lazily initialize the string for the current thread, and overwrite
 // any previous contents. It may also reallocate the string's buffer, if more
@@ -30,8 +24,40 @@ typedef size_t (*xx_log_output_fn)(void *, const void *, size_t);
 //
 // The given len should be the byte length of the contents ignoring any
 // terminating null byte. This function will add a terminating null byte to the
-// thread-local string after copying the given contents.
+// thread-local string after copying the contents.
 const char *set_info_string(const void *contents, size_t new_len);
+
+// ========================================================
+// Logging configuration
+
+// User-provided logging callbacks.
+typedef size_t (*xx_log_output_fn)(void * logger_data, const void *message, size_t message_len);
+
+// Wrapper function for calling logger function pointers.
+size_t bridge_log_output(xx_log_output_fn logger, void *logger_data, const void *message, size_t message_len);
+
+// Library-provided default callback for writing log messages to a C FILE*.
+size_t file_logger(void *file, const void *data, size_t data_len);
+
+// ========================================================
+// Network health callbacks
+
+// User-provided network health status callbacks.
+typedef void (*cmix_status_callback_fn)(int healthy, void *cb_data);
+
+// Wrapper function for calling health status function pointers.
+void bridge_health_callback(cmix_status_callback_fn cb, int healthy, void *cb_data);
+
+/////////////////////////////////////////////////////////////////////////////
+//                                                                         //
+// Direct Messaging Callbacks (you must implement these)                   //
+//                                                                         //
+/////////////////////////////////////////////////////////////////////////////
+
+typedef struct {
+  int   len;
+  void* data;
+} GoByteSlice;
 
 typedef long (* cmix_dm_receive_fn)(int dm_instance_id,
   void* message_id, int message_id_len,
