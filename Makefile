@@ -10,13 +10,13 @@
 ### Configurable variables:
 #
 # - CXX (default "g++")
-# 	C++ compiler
+# 	C++ compiler (used for tests/examples)
 #
 # - CPPFLAGS (default empty)
 # 	C preprocessor flags
 #
 # - CXXFLAGS (default "-Wall -I.")
-# 	C++ compiler flags
+# 	C++ compiler flags (used for tests/examples)
 #
 # - LDFLAGS (default "-lxxdk -L. -Wl,-rpath,.")
 # 	Linker flags
